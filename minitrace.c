@@ -14,14 +14,23 @@
 
 #include "minitrace.h"
 
+// Ugh, this struct is already pretty heavy.
+// Will probably need to move arguments to a second buffer to support more than one.
 typedef struct raw_event {
 	const char *name;
 	const char *cat;
+	void *id;
 	uint64_t ts;
 	uint32_t pid;
 	uint32_t tid;
 	char ph;
-	// We don't bother with pid or args at the moment.
+	mtr_arg_type arg_type;
+	const char *arg_name;
+	union {
+		const char *a_str;
+		int a_int;
+		double a_double;
+	};
 } raw_event_t;
 
 static raw_event_t *buffer;
@@ -112,14 +121,39 @@ void mtr_stop() {
 void mtr_flush() {
 	int i = 0, cnt = 0;
 	char linebuf[256];
-
+	char arg_buf[256];
+	char id_buf[256];
 retry:
 	cnt = count;
 	for (i = 0; i < cnt; i++) {
 		raw_event_t *raw = &buffer[i];
-		int len = sprintf(linebuf, "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%llu,\"ph\":\"%c\",\"name\":\"%s\",\"args\":{}}",
-			first_line ? "" : ",\n",
-			raw->cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name);
+		int len;
+		switch (raw->arg_type) {
+		case MTR_ARG_TYPE_INT:
+			sprintf(arg_buf, "\"%s\":%i", raw->arg_name, raw->a_int);
+			break;
+		case MTR_ARG_TYPE_STRING_CONST:
+			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
+			break;
+		case MTR_ARG_TYPE_NONE:
+		default:
+			arg_buf[0] = '\0';
+			break;
+		}
+		if (raw->id) {
+			switch (raw->ph) {
+			case 'S':
+			case 'T':
+			case 'F':
+				// TODO: Support full 64-bit pointers
+				sprintf(id_buf, ",\"id\":\"0x%08x\"", (uint32_t)raw->id);
+			}
+		} else {
+			id_buf[0] = 0;
+		}
+		len = sprintf(linebuf, "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%llu,\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
+				first_line ? "" : ",\n",
+				raw->cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name, arg_buf, id_buf);
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 	}
@@ -131,13 +165,14 @@ retry:
 }
 
 // Gotta be fast!
-void mtr_raw_event(const char *category, const char *name, char ph) {
+void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
 	if (count >= BUFFER_SIZE || !started)
 		return;
-	double ts = real_time_s(); 
+	double ts = real_time_s();
 	raw_event_t *ev = &buffer[count++];
 	ev->cat = category;
 	ev->name = name;
+	ev->id = id;
 	ev->ts = (int64_t)(ts * 1000000);
 	ev->ph = ph;
 	if (!cur_thread_id) {
@@ -146,3 +181,30 @@ void mtr_raw_event(const char *category, const char *name, char ph) {
 	ev->tid = cur_thread_id;
 	ev->pid = 0;
 }
+
+// Gotta be fast!
+void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value) {
+	if (count >= BUFFER_SIZE || !started)
+		return;
+	double ts = real_time_s();
+	raw_event_t *ev = &buffer[count++];
+	ev->cat = category;
+	ev->name = name;
+	ev->id = id;
+	ev->ts = (int64_t)(ts * 1000000);
+	ev->ph = ph;
+	if (!cur_thread_id) {
+		cur_thread_id = get_cur_thread_id();
+	}
+	ev->tid = cur_thread_id;
+	ev->pid = 0;
+	ev->arg_type = arg_type;
+	ev->arg_name = arg_name;
+	switch (arg_type) {
+	case MTR_ARG_TYPE_INT: ev->a_int = (int)arg_value; break;
+	case MTR_ARG_TYPE_STRING_CONST:	ev->a_str = (const char*)arg_value; break;
+	default:
+		break;
+	}
+}
+
