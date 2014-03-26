@@ -1,10 +1,18 @@
 minitrace
 =========
-by Henrik Rydgård 2014
+by Henrik Rydgård 2014 (hrydgard+minitrace@gmail.com)
 
-Simple C/C++ library for producing JSON traces suitable for Chrome's built-in excellent trace viewer (about:tracing).
+C library with C++ helpers for producing JSON traces suitable for Chrome's built-in excellent trace viewer (about:tracing).
 
-Extremely simple to use.
+Extremely simple to build and use. Tested on Mac and Windows, but should compile anywhere you can use ANSI C with few or no changes.
+
+Sample output (see example code below):
+
+![minitrace](http://www.ppsspp.org/img/minitrace.png)
+
+
+How to use
+----------
 
   1. Include minitrace.c and minitrace.h in your project. #include minitrace.h in some common header.
 
@@ -42,8 +50,8 @@ top of the header file.
 
 Note: Please only use string literals in MTR statements.
 
-Here's an example:
-
+Example code
+------------
 
     int main(int argc, const char *argv[]) {
       int i;
@@ -81,11 +89,11 @@ Here's an example:
       return 0;
     }
 
-It will result in something looking a little like this:
-
-![minitrace](http://www.ppsspp.org/img/minitrace.png)
+It will result in something looking a little like the picture at the top of this readme.
 
 Future plans:
 
   * Builtin background flush thread support with better synchronization, no more fixed limit
-  * Support for trace arguments
+  * Support for more trace arguments, more tracing types
+
+If you use this, feel free to tell me how, and what issues you may have had. hrydgard+minitrace@gmail.com
