@@ -39,6 +39,7 @@ int main(int argc, const char *argv[]) {
 	MTR_START("background", "long_running", &long_running_thing_1);
 	MTR_START("background", "long_running", &long_running_thing_2);
 
+	MTR_COUNTER("main", "greebles", 3);
 	MTR_BEGIN("main", "outer");
 	usleep(80000);
 	for (i = 0; i < 3; i++) {
@@ -46,10 +47,12 @@ int main(int argc, const char *argv[]) {
 		usleep(40000);
 		MTR_END("main", "inner");
 		usleep(10000);
+		MTR_COUNTER("main", "greebles", 3 * i + 10);
 	}
 	MTR_STEP("background", "long_running", &long_running_thing_1, "middle step");
 	usleep(80000);
 	MTR_END("main", "outer");
+	MTR_COUNTER("main", "greebles", 0);
 
 	usleep(10000);
 	a();

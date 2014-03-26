@@ -183,11 +183,11 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	if (ev->ph == 'X') {
 		double x;
 		memcpy(&x, id, sizeof(double));
-    ev->ts = x * 1000000;
+		ev->ts = x * 1000000;
 		ev->a_double = (ts - x) * 1000000;
 	} else {
-	  ev->ts = (int64_t)(ts * 1000000);
-  }
+		ev->ts = (int64_t)(ts * 1000000);
+	}
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
 	}

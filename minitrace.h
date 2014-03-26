@@ -64,31 +64,35 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_END(c, n) internal_mtr_raw_event(c, n, 'E', 0)
 #define MTR_SCOPE(c, n) MTRScopedTrace ____mtr_scope(c, n)
 
-#define MTR_START(c, n, id) internal_mtr_raw_event(c, n, 'S', (void *)id)
-#define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)id, MTR_ARG_TYPE_STRING_CONST, "step", (void *)step)
-#define MTR_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'F', (void *)id)
+#define MTR_START(c, n, id) internal_mtr_raw_event(c, n, 'S', (void *)(id))
+#define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)(id), MTR_ARG_TYPE_STRING_CONST, "step", (void *)(step))
+#define MTR_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'F', (void *)(id))
 
 // BEGIN/END with a single named argument. _C is for a const string arg, _I for int.
 
 // Note that it's fine to match BEGIN_S with END and BEGIN with END_S, etc.
-#define MTR_BEGIN_C(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)astrval)
-#define MTR_END_C(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)astrval)
-#define MTR_SCOPE_C(c, n, aname, astrval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_STRING_CONST, aname, (void *)astrval)
+#define MTR_BEGIN_C(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
+#define MTR_END_C(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
+#define MTR_SCOPE_C(c, n, aname, astrval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
 
-#define MTR_BEGIN_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_INT, aname, (void*)aintval)
-#define MTR_END_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_INT, aname, (void*)aintval)
-#define MTR_SCOPE_I(c, n, aname, aintval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_INT, aname, (void*)aintval)
+#define MTR_BEGIN_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
+#define MTR_END_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
+#define MTR_SCOPE_I(c, n, aname, aintval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
 
 #define MTR_INSTANT(c, n) internal_mtr_raw_event(c, n, 'I', 0)
-#define MTR_INSTANT_C(c, n, aname, astrval) internal_mtr_raw_event(c, n, 'I', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)astrval)
-#define MTR_INSTANT_I(c, n, aname, aintval) internal_mtr_raw_event(c, n, 'I', 0, MTR_ARG_TYPE_INT, aname, (void *)aintval)
+#define MTR_INSTANT_C(c, n, aname, astrval) internal_mtr_raw_event(c, n, 'I', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
+#define MTR_INSTANT_I(c, n, aname, aintval) internal_mtr_raw_event(c, n, 'I', 0, MTR_ARG_TYPE_INT, aname, (void *)(aintval))
+
+// Counters (can't do multi-value counters yet)
+#define MTR_COUNTER(c, n, val) internal_mtr_raw_event_arg(c, n, 'C', 0, MTR_ARG_TYPE_INT, n, (void *)(intptr_t)(val))
+
 
 // Metadata. Call at the start preferably. Must be const strings.
 
-#define MTR_META_PROCESS_NAME(n) internal_mtr_raw_event_arg("", "process_name", 'M', 0, MTR_ARG_TYPE_STRING_CONST, "name", (void *)n);
+#define MTR_META_PROCESS_NAME(n) internal_mtr_raw_event_arg("", "process_name", 'M', 0, MTR_ARG_TYPE_STRING_CONST, "name", (void *)(n))
 
-#define MTR_META_THREAD_NAME(n) internal_mtr_raw_event_arg("", "thread_name", 'M', 0, MTR_ARG_TYPE_STRING_CONST, "name", (void *)n);
-#define MTR_META_THREAD_SORT_INDEX(i) internal_mtr_raw_event_arg("", "thread_sort_index", 'M', 0, MTR_ARG_TYPE_INT, "sort_index", (void *)i);
+#define MTR_META_THREAD_NAME(n) internal_mtr_raw_event_arg("", "thread_name", 'M', 0, MTR_ARG_TYPE_STRING_CONST, "name", (void *)(n))
+#define MTR_META_THREAD_SORT_INDEX(i) internal_mtr_raw_event_arg("", "thread_sort_index", 'M', 0, MTR_ARG_TYPE_INT, "sort_index", (void *)(i))
 
 #else
 
