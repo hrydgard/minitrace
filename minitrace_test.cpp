@@ -7,6 +7,25 @@
 #include <unistd.h>
 #endif
 
+void c() {
+	MTR_SCOPE("c++", "c()");
+	usleep(10000);
+}
+
+void b() {
+	MTR_SCOPE("c++", "b()");
+	usleep(20000);
+	c();
+	usleep(10000);
+}
+
+void a() {
+	MTR_SCOPE("c++", "a()");
+	usleep(20000);
+	b();
+	usleep(10000);
+}
+
 int main(int argc, const char *argv[]) {
 	int i;
 	mtr_init("trace.json");
@@ -31,6 +50,9 @@ int main(int argc, const char *argv[]) {
 	MTR_STEP("background", "long_running", &long_running_thing_1, "middle step");
 	usleep(80000);
 	MTR_END("main", "outer");
+
+	usleep(10000);
+	a();
 
 	usleep(50000);
 	MTR_INSTANT("main", "the end");

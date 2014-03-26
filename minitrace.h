@@ -36,6 +36,7 @@ void mtr_start();
 void mtr_stop();
 
 void mtr_flush();
+double mtr_time_s();
 
 // Commented-out types will be supported in the future.
 typedef enum {
@@ -64,7 +65,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_SCOPE(c, n) MTRScopedTrace ____mtr_scope(c, n)
 
 #define MTR_START(c, n, id) internal_mtr_raw_event(c, n, 'S', (void *)id)
-#define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)id, MTR_ARG_TYPE_STRING_CONST, "step", step)
+#define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)id, MTR_ARG_TYPE_STRING_CONST, "step", (void *)step)
 #define MTR_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'F', (void *)id)
 
 // BEGIN/END with a single named argument. _C is for a const string arg, _I for int.
@@ -103,27 +104,31 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #ifdef __cplusplus
 }
 
+// These are optimized to use X events (combined B and E). Much easier to do in C++ than in C.
 class MTRScopedTrace {
 public:
-	MTRScopedTrace(const char *category, const char *name) : category_(category), name_(name) {
-		internal_mtr_raw_event(category, name, 'B');
+	MTRScopedTrace(const char *category, const char *name)
+		: category_(category), name_(name) {
+		start_time_ = mtr_time_s();
 	}
 	~MTRScopedTrace() {
-		internal_mtr_raw_event(category, name, 'E');
+		internal_mtr_raw_event(category_, name_, 'X', &start_time_);
 	}
 
 private:
 	const char *category_;
 	const char *name_;
+	double start_time_;
 };
 
 class MTRScopedTraceArg {
 public:
-	MTRScopedTrace(const char *category, const char *name, mtr_arg_type arg_type, const char *arg_name, void *arg_value) : category_(category), name_(name) {
-		internal_mtr_raw_event_arg(category, name, 'B', arg_type, arg_name, arg_value);
+	MTRScopedTraceArg(const char *category, const char *name, mtr_arg_type arg_type, const char *arg_name, void *arg_value)
+		: category_(category), name_(name) {
+		internal_mtr_raw_event_arg(category, name, 'B', 0, arg_type, arg_name, arg_value);
 	}
-	~MTRScopedTrace() {
-		internal_mtr_raw_event(category, name, 'E');
+	~MTRScopedTraceArg() {
+		internal_mtr_raw_event(category_, name_, 'E', 0);
 	}
 
 private:

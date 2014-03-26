@@ -47,7 +47,7 @@ static __thread int cur_thread_id;
 // Tiny portability layer.
 // Exposes:
 //	 get_cur_thread_id()
-//	 real_time_s()
+//	 mtr_time_s()
 #ifdef _WIN32
 static int get_cur_thread_id() {
 	return (int)GetCurrentThreadId();
@@ -55,7 +55,7 @@ static int get_cur_thread_id() {
 
 static uint64_t _frequency = 0;
 static uint64_t _starttime = 0;
-static double real_time_s() {
+double mtr_time_s() {
 	if (_frequency == 0) {
 		QueryPerformanceFrequency((LARGE_INTEGER*)&_frequency);
 		QueryPerformanceCounter((LARGE_INTEGER*)&_starttime);
@@ -67,17 +67,17 @@ static double real_time_s() {
 #else
 
 static inline int get_cur_thread_id() {
-	return (int)pthread_self();
+	return (int)(intptr_t)pthread_self();
 }
 
 #if defined(BLACKBERRY)
-static double real_time_s() {
+double mtr_time_s() {
 	struct timespec time;
 	clock_gettime(CLOCK_MONOTONIC, &time); // Linux must use CLOCK_MONOTONIC_RAW due to time warps
 	return time.tv_sec + time.tv_nsec / 1.0e9;
 }
 #else
-static double real_time_s() {
+double mtr_time_s() {
 	static time_t start;
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -92,13 +92,13 @@ static double real_time_s() {
 #endif
 
 void mtr_init(const char *json_file) {
-	buffer = malloc(BUFFER_SIZE * sizeof(raw_event_t));
+	buffer = (raw_event_t *)malloc(BUFFER_SIZE * sizeof(raw_event_t));
 	started = 1;
 	count = 0;
 	f = fopen(json_file, "wb");
 	const char *header = "{\"traceEvents\":[\n";
 	fwrite(header, 1, strlen(header), f);
-	time_offset = (uint64_t)(real_time_s() * 1000000);
+	time_offset = (uint64_t)(mtr_time_s() * 1000000);
 	first_line = 1;
 }
 
@@ -148,7 +148,11 @@ retry:
 			case 'T':
 			case 'F':
 				// TODO: Support full 64-bit pointers
-				sprintf(id_buf, ",\"id\":\"0x%08x\"", (uint32_t)raw->id);
+				sprintf(id_buf, ",\"id\":\"0x%08x\"", (uint32_t)(uintptr_t)raw->id);
+				break;
+			case 'X':
+				sprintf(id_buf, ",\"dur\":%i", (int)raw->a_double);
+				break;
 			}
 		} else {
 			id_buf[0] = 0;
@@ -170,13 +174,20 @@ retry:
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
 	if (count >= BUFFER_SIZE || !started)
 		return;
-	double ts = real_time_s();
+	double ts = mtr_time_s();
 	raw_event_t *ev = &buffer[count++];
 	ev->cat = category;
 	ev->name = name;
 	ev->id = id;
-	ev->ts = (int64_t)(ts * 1000000);
 	ev->ph = ph;
+	if (ev->ph == 'X') {
+		double x;
+		memcpy(&x, id, sizeof(double));
+    ev->ts = x * 1000000;
+		ev->a_double = (ts - x) * 1000000;
+	} else {
+	  ev->ts = (int64_t)(ts * 1000000);
+  }
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
 	}
@@ -188,7 +199,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value) {
 	if (count >= BUFFER_SIZE || !started)
 		return;
-	double ts = real_time_s();
+	double ts = mtr_time_s();
 	raw_event_t *ev = &buffer[count++];
 	ev->cat = category;
 	ev->name = name;
@@ -203,7 +214,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	ev->arg_type = arg_type;
 	ev->arg_name = arg_name;
 	switch (arg_type) {
-	case MTR_ARG_TYPE_INT: ev->a_int = (int)arg_value; break;
+	case MTR_ARG_TYPE_INT: ev->a_int = (int)(uintptr_t)arg_value; break;
 	case MTR_ARG_TYPE_STRING_CONST:	ev->a_str = (const char*)arg_value; break;
 	default:
 		break;
