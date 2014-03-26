@@ -18,5 +18,16 @@
 *.app
 minitrace_test
 
+# MSVC stuff
+*.opensdf
+*.sdf
+Debug
+Release
+x64
+*.suo
+
+# Misc
+.gitattributes
+
 # Traces
 trace.json

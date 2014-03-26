@@ -5,7 +5,10 @@
 #include <string.h>
 
 #ifdef _WIN32
+#pragma warning (disable:4996)
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#define __thread __declspec(thread)
 #else
 #include <pthread.h>
 #include <sys/time.h>
@@ -46,7 +49,7 @@ static __thread int cur_thread_id;
 //	 get_cur_thread_id()
 //	 real_time_s()
 #ifdef _WIN32
-static inline int get_cur_thread_id() {
+static int get_cur_thread_id() {
 	return (int)GetCurrentThreadId();
 }
 
@@ -56,7 +59,6 @@ static double real_time_s() {
 	if (_frequency == 0) {
 		QueryPerformanceFrequency((LARGE_INTEGER*)&_frequency);
 		QueryPerformanceCounter((LARGE_INTEGER*)&_starttime);
-		curtime = 0;
 	}
 	__int64 time;
 	QueryPerformanceCounter((LARGE_INTEGER*)&time);
@@ -96,7 +98,7 @@ void mtr_init(const char *json_file) {
 	f = fopen(json_file, "wb");
 	const char *header = "{\"traceEvents\":[\n";
 	fwrite(header, 1, strlen(header), f);
-	time_offset = real_time_s();
+	time_offset = (uint64_t)(real_time_s() * 1000000);
 	first_line = 1;
 }
 
