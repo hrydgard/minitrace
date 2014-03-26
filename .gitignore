@@ -16,3 +16,7 @@
 *.exe
 *.out
 *.app
+minitrace_test
+
+# Traces
+trace.json
