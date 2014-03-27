@@ -15,6 +15,7 @@
 #include <windows.h>
 #define __thread __declspec(thread)
 #else
+#include <signal.h>
 #include <pthread.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -43,7 +44,7 @@ typedef struct raw_event {
 
 static raw_event_t *buffer;
 static volatile int count;
-static int started = 0;
+static int tracing = 0;
 static uint64_t time_offset;
 static int first_line = 1;
 static FILE *f;
@@ -72,6 +73,11 @@ double mtr_time_s() {
 	QueryPerformanceCounter((LARGE_INTEGER*)&time);
 	return ((double) (time - _starttime) / (double) _frequency);
 }
+
+void mtr_register_sigint_handler() {
+	// TODO
+}
+
 #else
 
 static inline int get_cur_thread_id() {
@@ -97,11 +103,27 @@ double mtr_time_s() {
 }
 #endif	// !BLACKBERRY
 
+static void termination_handler(int signum) {
+	if (tracing) {
+		printf("Ctrl-C detected! Flushing trace info and shutting down.\n");
+		mtr_flush();
+		fwrite("\n]}\n", 1, 4, f);
+		fclose(f);
+		exit(1);
+	}
+}
+
+void mtr_register_sigint_handler() {
+	// Avoid altering set-to-be-ignored handlers while registering.
+	if (signal(SIGINT, &termination_handler) == SIG_IGN)
+		signal(SIGINT, SIG_IGN);
+}
+
 #endif
 
 void mtr_init(const char *json_file) {
 	buffer = (raw_event_t *)malloc(BUFFER_SIZE * sizeof(raw_event_t));
-	started = 1;
+	tracing = 1;
 	count = 0;
 	f = fopen(json_file, "wb");
 	const char *header = "{\"traceEvents\":[\n";
@@ -140,11 +162,11 @@ const char *mtr_pool_string(const char *str) {
 }
 
 void mtr_start() {
-	started = 1;
+	tracing = 1;
 }
 
 void mtr_stop() {
-	started = 0;
+	tracing = 0;
 }
 
 // TODO: fwrite more than one line at a time.
@@ -166,9 +188,9 @@ retry:
 			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_STRING_COPY:
-			if (strlen(raw->a_str) > 700) {
-				((char*)raw->a_str)[700] = 0;
-			}
+		if (strlen(raw->a_str) > 700) {
+			((char*)raw->a_str)[700] = 0;
+		}
 			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_NONE:
@@ -206,7 +228,7 @@ retry:
 
 // Gotta be fast!
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
-	if (count >= BUFFER_SIZE || !started)
+	if (count >= BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();
 	raw_event_t *ev = &buffer[count++];
@@ -231,7 +253,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 
 // Gotta be fast!
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value) {
-	if (count >= BUFFER_SIZE || !started)
+	if (count >= BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();
 	raw_event_t *ev = &buffer[count++];

@@ -40,6 +40,9 @@ void mtr_stop();
 void mtr_flush();
 double mtr_time_s();
 
+// Note: Does nothing on Win32 yet
+void mtr_register_sigint_handler();
+
 // If str is semi dynamic, store it permanently in a pool so we don't need to malloc it.
 // Not exactly fast though, should use a hash table or something.
 const char *mtr_pool_string(const char *str);
@@ -97,11 +100,13 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 // Counters (can't do multi-value counters yet)
 #define MTR_COUNTER(c, n, val) internal_mtr_raw_event_arg(c, n, 'C', 0, MTR_ARG_TYPE_INT, n, (void *)(intptr_t)(val))
 
-// Shortcuts for simple function timing with automatic categories.
+// Shortcuts for simple function timing with automatic categories and names.
 #define MTR_BEGIN_FUNC() MTR_BEGIN(__FILE__, __FUNCTION__)
 #define MTR_END_FUNC() MTR_END(__FILE__, __FUNCTION__)
 #define MTR_BEGIN_FUNC_S(aname, arg) MTR_BEGIN_S(__FILE__, __FUNCTION__, aname, arg)
-#define MTR_END_FUNC_S(aname, arg) MTR_END(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_END_FUNC_S(aname, arg) MTR_END_S(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_BEGIN_FUNC_C(aname, arg) MTR_BEGIN_C(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_END_FUNC_C(aname, arg) MTR_END_C(__FILE__, __FUNCTION__, aname, arg)
 
 // Metadata. Call at the start preferably. Must be const strings.
 
