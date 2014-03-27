@@ -19,7 +19,7 @@
 
 // #define MTR_DISABLED
 
-// By default, will collect up to 100000 events, then you must flush.
+// By default, will collect up to 1000000 events, then you must flush.
 // It's recommended that you simply call mtr_flush on a background thread
 // occasionally. It's safe...ish.
 #define BUFFER_SIZE 1000000
@@ -68,6 +68,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)(id), MTR_ARG_TYPE_STRING_CONST, "step", (void *)(step))
 #define MTR_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'F', (void *)(id))
 
+// Shortcuts for simple function timing with automatic categories.
+#define MTR_BEGIN_FUNC() internal_mtr_raw_event(__FILE__, __FUNCTION__, 'B', 0)
+#define MTR_END_FUNC() internal_mtr_raw_event(__FILE__, __FUNCTION__, 'E', 0)
 // BEGIN/END with a single named argument. _C is for a const string arg, _I for int.
 
 // Note that it's fine to match BEGIN_S with END and BEGIN with END_S, etc.

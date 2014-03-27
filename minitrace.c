@@ -103,8 +103,8 @@ void mtr_init(const char *json_file) {
 }
 
 void mtr_shutdown() {
-	fwrite("\n]}\n", 1, 4, f);
 	mtr_flush();
+	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
 	f = 0;
 	free(buffer);
