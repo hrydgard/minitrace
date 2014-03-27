@@ -109,11 +109,14 @@ static void termination_handler(int signum) {
 		mtr_flush();
 		fwrite("\n]}\n", 1, 4, f);
 		fclose(f);
-		exit(1);
 	}
+	exit(1);
 }
 
 void mtr_register_sigint_handler() {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	// Avoid altering set-to-be-ignored handlers while registering.
 	if (signal(SIGINT, &termination_handler) == SIG_IGN)
 		signal(SIGINT, SIG_IGN);
@@ -122,6 +125,9 @@ void mtr_register_sigint_handler() {
 #endif
 
 void mtr_init(const char *json_file) {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	buffer = (raw_event_t *)malloc(BUFFER_SIZE * sizeof(raw_event_t));
 	tracing = 1;
 	count = 0;
@@ -133,6 +139,9 @@ void mtr_init(const char *json_file) {
 }
 
 void mtr_shutdown() {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	mtr_flush();
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
@@ -162,15 +171,24 @@ const char *mtr_pool_string(const char *str) {
 }
 
 void mtr_start() {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	tracing = 1;
 }
 
 void mtr_stop() {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	tracing = 0;
 }
 
 // TODO: fwrite more than one line at a time.
 void mtr_flush() {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	int i = 0, cnt = 0;
 	char linebuf[1024];
 	char arg_buf[256];
@@ -188,9 +206,9 @@ retry:
 			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_STRING_COPY:
-		if (strlen(raw->a_str) > 700) {
-			((char*)raw->a_str)[700] = 0;
-		}
+			if (strlen(raw->a_str) > 700) {
+				((char*)raw->a_str)[700] = 0;
+			}
 			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_NONE:
@@ -228,6 +246,9 @@ retry:
 
 // Gotta be fast!
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	if (count >= BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();
@@ -253,6 +274,9 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 
 // Gotta be fast!
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value) {
+#ifndef MTR_ENABLED
+	return;
+#endif
 	if (count >= BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();

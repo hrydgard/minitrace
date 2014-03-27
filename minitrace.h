@@ -19,7 +19,7 @@
 
 #include <inttypes.h>
 
-// #define MTR_DISABLED
+// #define MTR_ENABLED
 
 // By default, will collect up to 1000000 events, then you must flush.
 // It's recommended that you simply call mtr_flush on a background thread
@@ -66,7 +66,7 @@ typedef enum {
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id);
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value);
 
-#ifndef MTR_DISABLED
+#ifdef MTR_ENABLED
 
 // Scopes. In C++, use MTR_SCOPE. In C, always match them within the same scope.
 #define MTR_BEGIN(c, n) internal_mtr_raw_event(c, n, 'B', 0)
@@ -100,14 +100,6 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 // Counters (can't do multi-value counters yet)
 #define MTR_COUNTER(c, n, val) internal_mtr_raw_event_arg(c, n, 'C', 0, MTR_ARG_TYPE_INT, n, (void *)(intptr_t)(val))
 
-// Shortcuts for simple function timing with automatic categories and names.
-#define MTR_BEGIN_FUNC() MTR_BEGIN(__FILE__, __FUNCTION__)
-#define MTR_END_FUNC() MTR_END(__FILE__, __FUNCTION__)
-#define MTR_BEGIN_FUNC_S(aname, arg) MTR_BEGIN_S(__FILE__, __FUNCTION__, aname, arg)
-#define MTR_END_FUNC_S(aname, arg) MTR_END_S(__FILE__, __FUNCTION__, aname, arg)
-#define MTR_BEGIN_FUNC_C(aname, arg) MTR_BEGIN_C(__FILE__, __FUNCTION__, aname, arg)
-#define MTR_END_FUNC_C(aname, arg) MTR_END_C(__FILE__, __FUNCTION__, aname, arg)
-
 // Metadata. Call at the start preferably. Must be const strings.
 
 #define MTR_META_PROCESS_NAME(n) internal_mtr_raw_event_arg("", "process_name", 'M', 0, MTR_ARG_TYPE_STRING_CONST, "name", (void *)(n))
@@ -124,7 +116,41 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_FINISH(c, n)
 #define MTR_INSTANT(c, n)
 
+#define MTR_BEGIN_C(c, n, aname, astrval)
+#define MTR_END_C(c, n, aname, astrval)
+#define MTR_SCOPE_C(c, n, aname, astrval)
+
+#define MTR_BEGIN_S(c, n, aname, astrval)
+#define MTR_END_S(c, n, aname, astrval)
+#define MTR_SCOPE_S(c, n, aname, astrval)
+
+#define MTR_BEGIN_I(c, n, aname, aintval)
+#define MTR_END_I(c, n, aname, aintval)
+#define MTR_SCOPE_I(c, n, aname, aintval)
+
+#define MTR_INSTANT(c, n)
+#define MTR_INSTANT_C(c, n, aname, astrval)
+#define MTR_INSTANT_I(c, n, aname, aintval)
+
+// Counters (can't do multi-value counters yet)
+#define MTR_COUNTER(c, n, val)
+
+// Metadata. Call at the start preferably. Must be const strings.
+
+#define MTR_META_PROCESS_NAME(n)
+
+#define MTR_META_THREAD_NAME(n)
+#define MTR_META_THREAD_SORT_INDEX(i)
+
 #endif
+
+// Shortcuts for simple function timing with automatic categories and names.
+#define MTR_BEGIN_FUNC() MTR_BEGIN(__FILE__, __FUNCTION__)
+#define MTR_END_FUNC() MTR_END(__FILE__, __FUNCTION__)
+#define MTR_BEGIN_FUNC_S(aname, arg) MTR_BEGIN_S(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_END_FUNC_S(aname, arg) MTR_END_S(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_BEGIN_FUNC_C(aname, arg) MTR_BEGIN_C(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_END_FUNC_C(aname, arg) MTR_END_C(__FILE__, __FUNCTION__, aname, arg)
 
 #ifdef __cplusplus
 }
