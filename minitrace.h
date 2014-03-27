@@ -1,5 +1,7 @@
-// Minitrace by Henrik Rydgård
-// Released under MIT license 2014
+// minitrace
+// by Henrik Rydgård 2014
+// http://www.github.com/hrydgard/minitrace
+// Released under the MIT license.
 //
 // Ultra-light dependency free library for performance tracing C/C++ applications.
 // Produces traces compatible with Google Chrome's trace viewer.
@@ -38,6 +40,10 @@ void mtr_stop();
 void mtr_flush();
 double mtr_time_s();
 
+// If str is semi dynamic, store it permanently in a pool so we don't need to malloc it.
+// Not exactly fast though, should use a hash table or something.
+const char *mtr_pool_string(const char *str);
+
 // Commented-out types will be supported in the future.
 typedef enum {
 	MTR_ARG_TYPE_NONE = 0,
@@ -45,7 +51,7 @@ typedef enum {
 	// MTR_ARG_TYPE_FLOAT = 2,
 	// MTR_ARG_TYPE_DOUBLE = 3,
 	MTR_ARG_TYPE_STRING_CONST = 8,	// C
-	// MTR_ARG_TYPE_STRING_COPY = 9,
+	MTR_ARG_TYPE_STRING_COPY = 9,
 	// MTR_ARG_TYPE_JSON_COPY = 10,
 } mtr_arg_type;
 
@@ -68,15 +74,17 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)(id), MTR_ARG_TYPE_STRING_CONST, "step", (void *)(step))
 #define MTR_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'F', (void *)(id))
 
-// Shortcuts for simple function timing with automatic categories.
-#define MTR_BEGIN_FUNC() internal_mtr_raw_event(__FILE__, __FUNCTION__, 'B', 0)
-#define MTR_END_FUNC() internal_mtr_raw_event(__FILE__, __FUNCTION__, 'E', 0)
+
 // BEGIN/END with a single named argument. _C is for a const string arg, _I for int.
 
 // Note that it's fine to match BEGIN_S with END and BEGIN with END_S, etc.
 #define MTR_BEGIN_C(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
 #define MTR_END_C(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
 #define MTR_SCOPE_C(c, n, aname, astrval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
+
+#define MTR_BEGIN_S(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_STRING_COPY, aname, (void *)(astrval))
+#define MTR_END_S(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_STRING_COPY, aname, (void *)(astrval))
+#define MTR_SCOPE_S(c, n, aname, astrval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_STRING_COPY, aname, (void *)(astrval))
 
 #define MTR_BEGIN_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
 #define MTR_END_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
@@ -89,6 +97,11 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 // Counters (can't do multi-value counters yet)
 #define MTR_COUNTER(c, n, val) internal_mtr_raw_event_arg(c, n, 'C', 0, MTR_ARG_TYPE_INT, n, (void *)(intptr_t)(val))
 
+// Shortcuts for simple function timing with automatic categories.
+#define MTR_BEGIN_FUNC() MTR_BEGIN(__FILE__, __FUNCTION__)
+#define MTR_END_FUNC() MTR_END(__FILE__, __FUNCTION__)
+#define MTR_BEGIN_FUNC_S(aname, arg) MTR_BEGIN_S(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_END_FUNC_S(aname, arg) MTR_END(__FILE__, __FUNCTION__, aname, arg)
 
 // Metadata. Call at the start preferably. Must be const strings.
 

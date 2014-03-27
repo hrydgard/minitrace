@@ -1,3 +1,8 @@
+// minitrace
+// by Henrik Rydgård 2014
+// http://www.github.com/hrydgard/minitrace
+// Released under the MIT license.
+
 // See minitrace.h for basic documentation.
 
 #include <stdlib.h>
@@ -43,6 +48,9 @@ static uint64_t time_offset;
 static int first_line = 1;
 static FILE *f;
 static __thread int cur_thread_id;
+
+#define STRING_POOL_SIZE 100
+static char *str_pool[100];
 
 // Tiny portability layer.
 // Exposes:
@@ -109,6 +117,26 @@ void mtr_shutdown() {
 	f = 0;
 	free(buffer);
 	buffer = 0;
+	for (int i = 0; i < STRING_POOL_SIZE; i++) {
+		if (str_pool[i]) {
+			free(str_pool[i]);
+			str_pool[i] = 0;
+		}
+	}
+}
+
+const char *mtr_pool_string(const char *str) {
+	for (int i = 0; i < STRING_POOL_SIZE; i++) {
+		if (!str_pool[i]) {
+			str_pool[i] = malloc(strlen(str) + 1);
+			strcpy(str_pool[i], str);
+			return str_pool[i];
+		} else {
+			if (!strcmp(str, str_pool[i]))
+				return str_pool[i];
+		}
+	}
+	return "string pool full";
 }
 
 void mtr_start() {
@@ -122,7 +150,7 @@ void mtr_stop() {
 // TODO: fwrite more than one line at a time.
 void mtr_flush() {
 	int i = 0, cnt = 0;
-	char linebuf[256];
+	char linebuf[1024];
 	char arg_buf[256];
 	char id_buf[256];
 retry:
@@ -135,6 +163,12 @@ retry:
 			sprintf(arg_buf, "\"%s\":%i", raw->arg_name, raw->a_int);
 			break;
 		case MTR_ARG_TYPE_STRING_CONST:
+			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
+			break;
+		case MTR_ARG_TYPE_STRING_COPY:
+			if (strlen(raw->a_str) > 700) {
+				((char*)raw->a_str)[700] = 0;
+			}
 			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_NONE:
@@ -216,6 +250,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	switch (arg_type) {
 	case MTR_ARG_TYPE_INT: ev->a_int = (int)(uintptr_t)arg_value; break;
 	case MTR_ARG_TYPE_STRING_CONST:	ev->a_str = (const char*)arg_value; break;
+	case MTR_ARG_TYPE_STRING_COPY: ev->a_str = strdup((const char*)arg_value); break;
 	default:
 		break;
 	}
