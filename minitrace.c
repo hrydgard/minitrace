@@ -49,6 +49,7 @@ static uint64_t time_offset;
 static int first_line = 1;
 static FILE *f;
 static __thread int cur_thread_id;
+static pthread_mutex_t mutex;
 
 #define STRING_POOL_SIZE 100
 static char *str_pool[100];
@@ -189,13 +190,14 @@ void mtr_flush() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	int i = 0, cnt = 0;
+	int i = 0;
 	char linebuf[1024];
 	char arg_buf[256];
 	char id_buf[256];
-retry:
-	cnt = count;
-	for (i = 0; i < cnt; i++) {
+	// We have to lock while flushing. So we really should avoid flushing as much as possible.
+
+	pthread_mutex_lock(&mutex);
+	for (i = 0; i < count; i++) {
 		raw_event_t *raw = &buffer[i];
 		int len;
 		switch (raw->arg_type) {
@@ -237,14 +239,11 @@ retry:
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 	}
+	pthread_mutex_unlock(&mutex);
 
-	// Yeah, so this isn't really threadsafe at all.
-	if (cnt < count)
-		goto retry;
 	count = 0;
 }
 
-// Gotta be fast!
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
 #ifndef MTR_ENABLED
 	return;
@@ -252,7 +251,9 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	if (count >= BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();
+	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count++];
+	pthread_mutex_unlock(&mutex);
 	ev->cat = category;
 	ev->name = name;
 	ev->id = id;
@@ -272,7 +273,6 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	ev->pid = 0;
 }
 
-// Gotta be fast!
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value) {
 #ifndef MTR_ENABLED
 	return;
@@ -280,7 +280,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	if (count >= BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();
+	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count++];
+	pthread_mutex_unlock(&mutex);
 	ev->cat = category;
 	ev->name = name;
 	ev->id = id;
