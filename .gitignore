@@ -17,6 +17,7 @@
 *.out
 *.app
 minitrace_test
+minitrace_test_mt
 
 # MSVC stuff
 *.opensdf
@@ -30,4 +31,4 @@ x64
 .gitattributes
 
 # Traces
-trace.json
+*.json

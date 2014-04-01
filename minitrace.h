@@ -1,5 +1,5 @@
 // minitrace
-// by Henrik Rydgård 2014
+// Copyright 2014 by Henrik Rydgård
 // http://www.github.com/hrydgard/minitrace
 // Released under the MIT license.
 //
@@ -72,13 +72,15 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_BEGIN(c, n) internal_mtr_raw_event(c, n, 'B', 0)
 #define MTR_END(c, n) internal_mtr_raw_event(c, n, 'E', 0)
 #define MTR_SCOPE(c, n) MTRScopedTrace ____mtr_scope(c, n)
+#define MTR_SCOPE_LIMIT(c, n, l) MTRScopedTraceLimit ____mtr_scope(c, n, l)
 
 #define MTR_START(c, n, id) internal_mtr_raw_event(c, n, 'S', (void *)(id))
 #define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)(id), MTR_ARG_TYPE_STRING_CONST, "step", (void *)(step))
 #define MTR_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'F', (void *)(id))
 
 
-// BEGIN/END with a single named argument. _C is for a const string arg, _I for int.
+// BEGIN/END with a single named argument. _C is for a const string arg, _I for int. _S will copy the string, which is expensive
+// but required if the string was generated dynamically.
 
 // Note that it's fine to match BEGIN_S with END and BEGIN with END_S, etc.
 #define MTR_BEGIN_C(c, n, aname, astrval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
@@ -102,9 +104,8 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 
 // Metadata. Call at the start preferably. Must be const strings.
 
-#define MTR_META_PROCESS_NAME(n) internal_mtr_raw_event_arg("", "process_name", 'M', 0, MTR_ARG_TYPE_STRING_CONST, "name", (void *)(n))
-
-#define MTR_META_THREAD_NAME(n) internal_mtr_raw_event_arg("", "thread_name", 'M', 0, MTR_ARG_TYPE_STRING_CONST, "name", (void *)(n))
+#define MTR_META_PROCESS_NAME(n) internal_mtr_raw_event_arg("", "process_name", 'M', 0, MTR_ARG_TYPE_STRING_COPY, "name", (void *)(n))
+#define MTR_META_THREAD_NAME(n) internal_mtr_raw_event_arg("", "thread_name", 'M', 0, MTR_ARG_TYPE_STRING_COPY, "name", (void *)(n))
 #define MTR_META_THREAD_SORT_INDEX(i) internal_mtr_raw_event_arg("", "thread_sort_index", 'M', 0, MTR_ARG_TYPE_INT, "sort_index", (void *)(i))
 
 #else
@@ -112,8 +113,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_BEGIN(c, n)
 #define MTR_END(c, n)
 #define MTR_SCOPE(c, n)
-#define MTR_START(c, n)
-#define MTR_FINISH(c, n)
+#define MTR_START(c, n, id)
+#define MTR_STEP(c, n, id, step)
+#define MTR_FINISH(c, n, id)
 #define MTR_INSTANT(c, n)
 
 #define MTR_BEGIN_C(c, n, aname, astrval)
@@ -147,10 +149,19 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 // Shortcuts for simple function timing with automatic categories and names.
 #define MTR_BEGIN_FUNC() MTR_BEGIN(__FILE__, __FUNCTION__)
 #define MTR_END_FUNC() MTR_END(__FILE__, __FUNCTION__)
+#define MTR_SCOPE_FUNC() MTR_SCOPE(__FILE__, __FUNCTION__)
+
 #define MTR_BEGIN_FUNC_S(aname, arg) MTR_BEGIN_S(__FILE__, __FUNCTION__, aname, arg)
 #define MTR_END_FUNC_S(aname, arg) MTR_END_S(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_SCOPE_FUNC_S(aname, arg) MTR_SCOPE_S(__FILE__, __FUNCTION__, aname, arg)
+
 #define MTR_BEGIN_FUNC_C(aname, arg) MTR_BEGIN_C(__FILE__, __FUNCTION__, aname, arg)
 #define MTR_END_FUNC_C(aname, arg) MTR_END_C(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_SCOPE_FUNC_C(aname, arg) MTR_SCOPE_C(__FILE__, __FUNCTION__, aname, arg)
+
+#define MTR_BEGIN_FUNC_I(aname, arg) MTR_BEGIN_I(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_END_FUNC_I(aname, arg) MTR_END_I(__FILE__, __FUNCTION__, aname, arg)
+#define MTR_SCOPE_FUNC_I(aname, arg) MTR_SCOPE_I(__FILE__, __FUNCTION__, aname, arg)
 
 #ifdef __cplusplus
 }
@@ -170,6 +181,28 @@ private:
 	const char *category_;
 	const char *name_;
 	double start_time_;
+};
+
+// Only outputs a block if execution time exceeded the limit.
+// TODO: This will effectively call mtr_time_s twice at the end, which is bad.
+class MTRScopedTraceLimit {
+public:
+	MTRScopedTraceLimit(const char *category, const char *name, double limit_s)
+		: category_(category), name_(name), limit_(limit_s) {
+		start_time_ = mtr_time_s();
+	}
+	~MTRScopedTraceLimit() {
+		double end_time = mtr_time_s();
+		if (end_time - start_time_ >= limit_) {
+			internal_mtr_raw_event(category_, name_, 'X', &start_time_);
+		}
+	}
+
+private:
+	const char *category_;
+	const char *name_;
+	double start_time_;
+	double limit_;
 };
 
 class MTRScopedTraceArg {

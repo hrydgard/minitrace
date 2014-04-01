@@ -1,5 +1,5 @@
 // minitrace
-// by Henrik Rydgård 2014
+// Copyright 2014 by Henrik Rydgård
 // http://www.github.com/hrydgard/minitrace
 // Released under the MIT license.
 
@@ -14,6 +14,11 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #define __thread __declspec(thread)
+#define pthread_mutex_t CRITICAL_SECTION
+#define pthread_mutex_init(a, b) InitializeCriticalSection(a)
+#define pthread_mutex_lock(a) EnterCriticalSection(a)
+#define pthread_mutex_unlock(a) LeaveCriticalSection(a)
+#define pthread_mutex_destroy(a) DeleteCriticalSection(a)
 #else
 #include <signal.h>
 #include <pthread.h>
@@ -58,6 +63,7 @@ static char *str_pool[100];
 // Exposes:
 //	 get_cur_thread_id()
 //	 mtr_time_s()
+//	 pthread basics
 #ifdef _WIN32
 static int get_cur_thread_id() {
 	return (int)GetCurrentThreadId();
@@ -77,6 +83,7 @@ double mtr_time_s() {
 
 void mtr_register_sigint_handler() {
 	// TODO
+	// Look into vectored exceptions.
 }
 
 #else
@@ -137,12 +144,14 @@ void mtr_init(const char *json_file) {
 	fwrite(header, 1, strlen(header), f);
 	time_offset = (uint64_t)(mtr_time_s() * 1000000);
 	first_line = 1;
+	pthread_mutex_init(&mutex, 0);
 }
 
 void mtr_shutdown() {
 #ifndef MTR_ENABLED
 	return;
 #endif
+  tracing = 0;
 	mtr_flush();
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
@@ -155,6 +164,7 @@ void mtr_shutdown() {
 			str_pool[i] = 0;
 		}
 	}
+  pthread_mutex_destroy(&mutex);
 }
 
 const char *mtr_pool_string(const char *str) {
@@ -239,9 +249,8 @@ void mtr_flush() {
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 	}
-	pthread_mutex_unlock(&mutex);
-
 	count = 0;
+	pthread_mutex_unlock(&mutex);
 }
 
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
@@ -251,6 +260,9 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	if (count >= BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();
+	if (!cur_thread_id) {
+		cur_thread_id = get_cur_thread_id();
+	}
 	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count++];
 	pthread_mutex_unlock(&mutex);
@@ -266,9 +278,6 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	} else {
 		ev->ts = (int64_t)(ts * 1000000);
 	}
-	if (!cur_thread_id) {
-		cur_thread_id = get_cur_thread_id();
-	}
 	ev->tid = cur_thread_id;
 	ev->pid = 0;
 }
@@ -279,6 +288,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #endif
 	if (count >= BUFFER_SIZE || !tracing)
 		return;
+	if (!cur_thread_id) {
+		cur_thread_id = get_cur_thread_id();
+	}
 	double ts = mtr_time_s();
 	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count++];
@@ -288,9 +300,6 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	ev->id = id;
 	ev->ts = (int64_t)(ts * 1000000);
 	ev->ph = ph;
-	if (!cur_thread_id) {
-		cur_thread_id = get_cur_thread_id();
-	}
 	ev->tid = cur_thread_id;
 	ev->pid = 0;
 	ev->arg_type = arg_type;
