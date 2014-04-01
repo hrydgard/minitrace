@@ -151,10 +151,11 @@ void mtr_shutdown() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-  tracing = 0;
+	tracing = 0;
 	mtr_flush();
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
+	pthread_mutex_destroy(&mutex);
 	f = 0;
 	free(buffer);
 	buffer = 0;
@@ -164,7 +165,6 @@ void mtr_shutdown() {
 			str_pool[i] = 0;
 		}
 	}
-  pthread_mutex_destroy(&mutex);
 }
 
 const char *mtr_pool_string(const char *str) {
@@ -263,9 +263,12 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
 	}
+
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[count++];
+	raw_event_t *ev = &buffer[count];
+	count++;
 	pthread_mutex_unlock(&mutex);
+
 	ev->cat = category;
 	ev->name = name;
 	ev->id = id;
@@ -292,9 +295,12 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 		cur_thread_id = get_cur_thread_id();
 	}
 	double ts = mtr_time_s();
+
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[count++];
+	raw_event_t *ev = &buffer[count];
+	count++;
 	pthread_mutex_unlock(&mutex);
+
 	ev->cat = category;
 	ev->name = name;
 	ev->id = id;
