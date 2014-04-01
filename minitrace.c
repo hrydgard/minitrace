@@ -49,11 +49,11 @@ typedef struct raw_event {
 
 static raw_event_t *buffer;
 static volatile int count;
-static int tracing = 0;
+static int is_tracing = 0;
 static int64_t time_offset;
 static int first_line = 1;
 static FILE *f;
-static __thread int cur_thread_id;
+static __thread int cur_thread_id;  // Thread local storage
 static pthread_mutex_t mutex;
 
 #define STRING_POOL_SIZE 100
@@ -83,7 +83,7 @@ double mtr_time_s() {
 
 // Ctrl+C handling for Windows console apps
 static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
-	if (tracing && fdwCtrlType == CTRL_C_EVENT) {
+	if (is_tracing && fdwCtrlType == CTRL_C_EVENT) {
 		printf("Ctrl-C detected! Flushing trace and shutting down.\n\n");
 		mtr_flush();
 		mtr_shutdown();
@@ -122,7 +122,7 @@ double mtr_time_s() {
 #endif	// !BLACKBERRY
 
 static void termination_handler(int signum) {
-	if (tracing) {
+	if (is_tracing) {
 		printf("Ctrl-C detected! Flushing trace and shutting down.\n\n");
 		mtr_flush();
 		fwrite("\n]}\n", 1, 4, f);
@@ -147,7 +147,7 @@ void mtr_init(const char *json_file) {
 	return;
 #endif
 	buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
-	tracing = 1;
+	is_tracing = 1;
 	count = 0;
 	f = fopen(json_file, "wb");
 	const char *header = "{\"traceEvents\":[\n";
@@ -161,7 +161,7 @@ void mtr_shutdown() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	tracing = 0;
+	is_tracing = 0;
 	mtr_flush();
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
@@ -195,14 +195,14 @@ void mtr_start() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	tracing = 1;
+	is_tracing = 1;
 }
 
 void mtr_stop() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	tracing = 0;
+	is_tracing = 0;
 }
 
 // TODO: fwrite more than one line at a time.
@@ -216,7 +216,11 @@ void mtr_flush() {
 	char id_buf[256];
 	// We have to lock while flushing. So we really should avoid flushing as much as possible.
 
+
 	pthread_mutex_lock(&mutex);
+	int old_tracing = is_tracing;
+	is_tracing = 0;  // Stop logging even if using interlocked increments instead of the mutex. Can cause data loss.
+
 	for (i = 0; i < count; i++) {
 		raw_event_t *raw = &buffer[i];
 		int len;
@@ -260,6 +264,7 @@ void mtr_flush() {
 		first_line = 0;
 	}
 	count = 0;
+	is_tracing = old_tracing;
 	pthread_mutex_unlock(&mutex);
 }
 
@@ -267,17 +272,22 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (count >= INTERNAL_MINITRACE_BUFFER_SIZE || !tracing)
+	if (!is_tracing || count >= INTERNAL_MINITRACE_BUFFER_SIZE)
 		return;
 	double ts = mtr_time_s();
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
 	}
 
+#if 0 && _WIN32  // TODO: This needs testing
+	int bufPos = InterlockedIncrement(&count);
+	raw_event_t *ev = &buffer[count - 1];
+#else
 	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count];
 	count++;
 	pthread_mutex_unlock(&mutex);
+#endif
 
 	ev->cat = category;
 	ev->name = name;
@@ -299,17 +309,22 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (count >= INTERNAL_MINITRACE_BUFFER_SIZE || !tracing)
+	if (!is_tracing || count >= INTERNAL_MINITRACE_BUFFER_SIZE)
 		return;
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
 	}
 	double ts = mtr_time_s();
 
+#if 0 && _WIN32  // TODO: This needs testing
+	int bufPos = InterlockedIncrement(&count);
+	raw_event_t *ev = &buffer[count - 1];
+#else
 	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count];
 	count++;
 	pthread_mutex_unlock(&mutex);
+#endif
 
 	ev->cat = category;
 	ev->name = name;
