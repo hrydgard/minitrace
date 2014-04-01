@@ -74,10 +74,15 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_SCOPE(c, n) MTRScopedTrace ____mtr_scope(c, n)
 #define MTR_SCOPE_LIMIT(c, n, l) MTRScopedTraceLimit ____mtr_scope(c, n, l)
 
+// Async events. Can span threads. ID identifies which events to connect in the view.
 #define MTR_START(c, n, id) internal_mtr_raw_event(c, n, 'S', (void *)(id))
 #define MTR_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 'T', (void *)(id), MTR_ARG_TYPE_STRING_CONST, "step", (void *)(step))
 #define MTR_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'F', (void *)(id))
 
+// Flow events. Like async events, but displayed in a more fancy way in the viewer.
+#define MTR_FLOW_START(c, n, id) internal_mtr_raw_event(c, n, 's', (void *)(id))
+#define MTR_FLOW_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 't', (void *)(id), MTR_ARG_TYPE_STRING_CONST, "step", (void *)(step))
+#define MTR_FLOW_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'f', (void *)(id))
 
 // BEGIN/END with a single named argument. _C is for a const string arg, _I for int. _S will copy the string, which is expensive
 // but required if the string was generated dynamically.
@@ -95,6 +100,8 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_END_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
 #define MTR_SCOPE_I(c, n, aname, aintval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
 
+
+// Instant events. For things with no duration.
 #define MTR_INSTANT(c, n) internal_mtr_raw_event(c, n, 'I', 0)
 #define MTR_INSTANT_C(c, n, aname, astrval) internal_mtr_raw_event(c, n, 'I', 0, MTR_ARG_TYPE_STRING_CONST, aname, (void *)(astrval))
 #define MTR_INSTANT_I(c, n, aname, aintval) internal_mtr_raw_event(c, n, 'I', 0, MTR_ARG_TYPE_INT, aname, (void *)(aintval))
@@ -116,6 +123,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_START(c, n, id)
 #define MTR_STEP(c, n, id, step)
 #define MTR_FINISH(c, n, id)
+#define MTR_FLOW_START(c, n, id)
+#define MTR_FLOW_STEP(c, n, id, step)
+#define MTR_FLOW_FINISH(c, n, id)
 #define MTR_INSTANT(c, n)
 
 #define MTR_BEGIN_C(c, n, aname, astrval)
