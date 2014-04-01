@@ -29,6 +29,7 @@ void a() {
 int main(int argc, const char *argv[]) {
 	int i;
 	mtr_init("trace.json");
+	mtr_register_sigint_handler();
 
 	MTR_META_PROCESS_NAME("minitrace_test");
 	MTR_META_THREAD_NAME("main thread");

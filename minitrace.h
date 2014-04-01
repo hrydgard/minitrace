@@ -1,4 +1,5 @@
-// minitrace
+// Minitrace
+//
 // Copyright 2014 by Henrik Rydgård
 // http://www.github.com/hrydgard/minitrace
 // Released under the MIT license.
@@ -19,46 +20,60 @@
 
 #include <inttypes.h>
 
+// If MTR_ENABLED is not defined, Minitrace does nothing and has near zero overhead.
+// Preferably, set this flag in your build system. If you can't just uncomment this line.
 // #define MTR_ENABLED
 
 // By default, will collect up to 1000000 events, then you must flush.
 // It's recommended that you simply call mtr_flush on a background thread
 // occasionally. It's safe...ish.
-#define BUFFER_SIZE 1000000
+#define INTERNAL_MINITRACE_BUFFER_SIZE 1000000
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// C API
+// Initializes Minitrace. Must be called very early during startup of your executable,
+// before any MTR_ statements..
 void mtr_init(const char *json_file);
+
+// Shuts down minitrace cleanly, flushing the trace buffer.
 void mtr_shutdown();
 
+// Lets you enable and disable Minitrace at runtime.
+// May cause strange discontinuities in the output.
+// Minitrace is enabled on startup by default.
 void mtr_start();
 void mtr_stop();
 
+// Flushes the collected data to disk, clearing the buffer for new data.
 void mtr_flush();
+
+// Returns the current time in seconds. Used internally by Minitrace. No caching.
 double mtr_time_s();
 
-// Note: Does nothing on Win32 yet
+// Registers a handler that will flush the trace on Ctrl+C.
+// Works on Linux and MacOSX, and in Win32 console applications.
 void mtr_register_sigint_handler();
 
-// If str is semi dynamic, store it permanently in a pool so we don't need to malloc it.
-// Not exactly fast though, should use a hash table or something.
+// Utility function that should rarely be used.
+// If str is semi dynamic, store it permanently in a small pool so we don't need to malloc it.
+// The pool fills up fast though and performance isn't great.
+// Returns a fixed string if the pool is full.
 const char *mtr_pool_string(const char *str);
 
 // Commented-out types will be supported in the future.
 typedef enum {
 	MTR_ARG_TYPE_NONE = 0,
 	MTR_ARG_TYPE_INT = 1,	// I
-	// MTR_ARG_TYPE_FLOAT = 2,
-	// MTR_ARG_TYPE_DOUBLE = 3,
+	// MTR_ARG_TYPE_FLOAT = 2,  // TODO
+	// MTR_ARG_TYPE_DOUBLE = 3,  // TODO
 	MTR_ARG_TYPE_STRING_CONST = 8,	// C
 	MTR_ARG_TYPE_STRING_COPY = 9,
 	// MTR_ARG_TYPE_JSON_COPY = 10,
 } mtr_arg_type;
 
-// TODO: Add support for more than one argument (metadat) per event
+// TODO: Add support for more than one argument (metadata) per event
 // Having more costs speed and memory.
 #define MTR_MAX_ARGS 1
 
@@ -67,6 +82,10 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value);
 
 #ifdef MTR_ENABLED
+
+// c - category. Can be filtered by in trace viewer (or at least that's the intention).
+//     A good use is to pass __FILE__, there are macros further below that will do it for you.
+// n - name. Pass __FUNCTION__ in most cases, unless you are marking up parts of one.
 
 // Scopes. In C++, use MTR_SCOPE. In C, always match them within the same scope.
 #define MTR_BEGIN(c, n) internal_mtr_raw_event(c, n, 'B', 0)
@@ -84,7 +103,10 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_FLOW_STEP(c, n, id, step) internal_mtr_raw_event_arg(c, n, 't', (void *)(id), MTR_ARG_TYPE_STRING_CONST, "step", (void *)(step))
 #define MTR_FLOW_FINISH(c, n, id) internal_mtr_raw_event(c, n, 'f', (void *)(id))
 
-// BEGIN/END with a single named argument. _C is for a const string arg, _I for int. _S will copy the string, which is expensive
+// The same macros, but with a single named argument which shows up as metadata in the viewer.
+// _I for int.
+// _C is for a const string arg.
+// _S will copy the string, freeing on flush (expensive but sometimes necessary).
 // but required if the string was generated dynamically.
 
 // Note that it's fine to match BEGIN_S with END and BEGIN with END_S, etc.
@@ -99,7 +121,6 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_BEGIN_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'B', 0, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
 #define MTR_END_I(c, n, aname, aintval) internal_mtr_raw_event_arg(c, n, 'E', 0, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
 #define MTR_SCOPE_I(c, n, aname, aintval) MTRScopedTraceArg ____mtr_scope(c, n, MTR_ARG_TYPE_INT, aname, (void*)(intptr_t)(aintval))
-
 
 // Instant events. For things with no duration.
 #define MTR_INSTANT(c, n) internal_mtr_raw_event(c, n, 'I', 0)
@@ -157,10 +178,13 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #endif
 
 // Shortcuts for simple function timing with automatic categories and names.
+
 #define MTR_BEGIN_FUNC() MTR_BEGIN(__FILE__, __FUNCTION__)
 #define MTR_END_FUNC() MTR_END(__FILE__, __FUNCTION__)
 #define MTR_SCOPE_FUNC() MTR_SCOPE(__FILE__, __FUNCTION__)
+#define MTR_INSTANT_FUNC() MTR_INSTANT(__FILE__, __FUNCTION__)
 
+// Same, but with a single argument of the usual types.
 #define MTR_BEGIN_FUNC_S(aname, arg) MTR_BEGIN_S(__FILE__, __FUNCTION__, aname, arg)
 #define MTR_END_FUNC_S(aname, arg) MTR_END_S(__FILE__, __FUNCTION__, aname, arg)
 #define MTR_SCOPE_FUNC_S(aname, arg) MTR_SCOPE_S(__FILE__, __FUNCTION__, aname, arg)

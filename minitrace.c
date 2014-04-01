@@ -34,7 +34,7 @@ typedef struct raw_event {
 	const char *name;
 	const char *cat;
 	void *id;
-	uint64_t ts;
+	int64_t ts;
 	uint32_t pid;
 	uint32_t tid;
 	char ph;
@@ -50,7 +50,7 @@ typedef struct raw_event {
 static raw_event_t *buffer;
 static volatile int count;
 static int tracing = 0;
-static uint64_t time_offset;
+static int64_t time_offset;
 static int first_line = 1;
 static FILE *f;
 static __thread int cur_thread_id;
@@ -81,9 +81,19 @@ double mtr_time_s() {
 	return ((double) (time - _starttime) / (double) _frequency);
 }
 
+// Ctrl+C handling for Windows console apps
+static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
+	if (tracing && fdwCtrlType == CTRL_C_EVENT) {
+		printf("Ctrl-C detected! Flushing trace and shutting down.\n\n");
+		mtr_flush();
+		mtr_shutdown();
+	}
+	ExitProcess(1);
+}
+
 void mtr_register_sigint_handler() {
-	// TODO
-	// Look into vectored exceptions.
+	// For console apps:
+	SetConsoleCtrlHandler(&CtrlHandler, TRUE);
 }
 
 #else
@@ -113,7 +123,7 @@ double mtr_time_s() {
 
 static void termination_handler(int signum) {
 	if (tracing) {
-		printf("Ctrl-C detected! Flushing trace info and shutting down.\n");
+		printf("Ctrl-C detected! Flushing trace and shutting down.\n\n");
 		mtr_flush();
 		fwrite("\n]}\n", 1, 4, f);
 		fclose(f);
@@ -136,7 +146,7 @@ void mtr_init(const char *json_file) {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	buffer = (raw_event_t *)malloc(BUFFER_SIZE * sizeof(raw_event_t));
+	buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	tracing = 1;
 	count = 0;
 	f = fopen(json_file, "wb");
@@ -257,7 +267,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (count >= BUFFER_SIZE || !tracing)
+	if (count >= INTERNAL_MINITRACE_BUFFER_SIZE || !tracing)
 		return;
 	double ts = mtr_time_s();
 	if (!cur_thread_id) {
@@ -276,7 +286,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	if (ev->ph == 'X') {
 		double x;
 		memcpy(&x, id, sizeof(double));
-		ev->ts = x * 1000000;
+		ev->ts = (int64_t)(x * 1000000);
 		ev->a_double = (ts - x) * 1000000;
 	} else {
 		ev->ts = (int64_t)(ts * 1000000);
@@ -289,7 +299,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (count >= BUFFER_SIZE || !tracing)
+	if (count >= INTERNAL_MINITRACE_BUFFER_SIZE || !tracing)
 		return;
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
