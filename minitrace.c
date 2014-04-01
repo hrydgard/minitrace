@@ -257,9 +257,24 @@ void mtr_flush() {
 		} else {
 			id_buf[0] = 0;
 		}
+		const char *cat = raw->cat;
+#ifdef _WIN32
+		// On Windows, we often end up with backslashes in category.
+		{
+			char temp[256];
+			int len = (int)strlen(cat);
+			if (len > 255) len = 255;
+			for (int i = 0; i < len; i++) {
+				temp[i] = cat[i] == '\\' ? '/' : cat[i];
+			}
+			temp[len] = 0;
+			cat = temp;
+		}
+#endif
+
 		len = sprintf(linebuf, "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%llu,\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
 				first_line ? "" : ",\n",
-				raw->cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name, arg_buf, id_buf);
+				cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name, arg_buf, id_buf);
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 	}

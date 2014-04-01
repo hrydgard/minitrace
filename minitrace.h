@@ -183,6 +183,8 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #define MTR_END_FUNC() MTR_END(__FILE__, __FUNCTION__)
 #define MTR_SCOPE_FUNC() MTR_SCOPE(__FILE__, __FUNCTION__)
 #define MTR_INSTANT_FUNC() MTR_INSTANT(__FILE__, __FUNCTION__)
+#define MTR_SCOPE_FUNC_LIMIT_S(l) MTRScopedTraceLimit ____mtr_scope(__FILE__, __FUNCTION__, l)
+#define MTR_SCOPE_FUNC_LIMIT_MS(l) MTRScopedTraceLimit ____mtr_scope(__FILE__, __FUNCTION__, (double)l * 0.000001)
 
 // Same, but with a single argument of the usual types.
 #define MTR_BEGIN_FUNC_S(aname, arg) MTR_BEGIN_S(__FILE__, __FUNCTION__, aname, arg)
@@ -200,6 +202,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #ifdef __cplusplus
 }
 
+#ifdef MTR_ENABLED
 // These are optimized to use X events (combined B and E). Much easier to do in C++ than in C.
 class MTRScopedTrace {
 public:
@@ -253,5 +256,6 @@ private:
 	const char *category_;
 	const char *name_;
 };
+#endif
 
 #endif
