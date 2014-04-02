@@ -53,7 +53,7 @@ static int is_tracing = 0;
 static int64_t time_offset;
 static int first_line = 1;
 static FILE *f;
-static __thread int cur_thread_id;  // Thread local storage
+static __thread int cur_thread_id;	// Thread local storage
 static pthread_mutex_t mutex;
 
 #define STRING_POOL_SIZE 100
@@ -158,6 +158,7 @@ void mtr_init(const char *json_file) {
 }
 
 void mtr_shutdown() {
+	int i;
 #ifndef MTR_ENABLED
 	return;
 #endif
@@ -169,7 +170,7 @@ void mtr_shutdown() {
 	f = 0;
 	free(buffer);
 	buffer = 0;
-	for (int i = 0; i < STRING_POOL_SIZE; i++) {
+	for (i = 0; i < STRING_POOL_SIZE; i++) {
 		if (str_pool[i]) {
 			free(str_pool[i]);
 			str_pool[i] = 0;
@@ -178,7 +179,8 @@ void mtr_shutdown() {
 }
 
 const char *mtr_pool_string(const char *str) {
-	for (int i = 0; i < STRING_POOL_SIZE; i++) {
+	int i;
+	for (i = 0; i < STRING_POOL_SIZE; i++) {
 		if (!str_pool[i]) {
 			str_pool[i] = malloc(strlen(str) + 1);
 			strcpy(str_pool[i], str);
@@ -219,7 +221,7 @@ void mtr_flush() {
 
 	pthread_mutex_lock(&mutex);
 	int old_tracing = is_tracing;
-	is_tracing = 0;  // Stop logging even if using interlocked increments instead of the mutex. Can cause data loss.
+	is_tracing = 0;	// Stop logging even if using interlocked increments instead of the mutex. Can cause data loss.
 
 	for (i = 0; i < count; i++) {
 		raw_event_t *raw = &buffer[i];
@@ -263,8 +265,9 @@ void mtr_flush() {
 		{
 			char temp[256];
 			int len = (int)strlen(cat);
+			int i;
 			if (len > 255) len = 255;
-			for (int i = 0; i < len; i++) {
+			for (i = 0; i < len; i++) {
 				temp[i] = cat[i] == '\\' ? '/' : cat[i];
 			}
 			temp[len] = 0;
@@ -294,7 +297,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 		cur_thread_id = get_cur_thread_id();
 	}
 
-#if 0 && _WIN32  // TODO: This needs testing
+#if 0 && _WIN32	// TODO: This needs testing
 	int bufPos = InterlockedIncrement(&count);
 	raw_event_t *ev = &buffer[count - 1];
 #else
@@ -331,7 +334,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	}
 	double ts = mtr_time_s();
 
-#if 0 && _WIN32  // TODO: This needs testing
+#if 0 && _WIN32	// TODO: This needs testing
 	int bufPos = InterlockedIncrement(&count);
 	raw_event_t *ev = &buffer[count - 1];
 #else
