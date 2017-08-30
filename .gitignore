@@ -26,6 +26,7 @@ Debug
 Release
 x64
 *.suo
+*.vs
 
 # Misc
 .gitattributes

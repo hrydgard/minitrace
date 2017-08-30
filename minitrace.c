@@ -28,6 +28,8 @@
 
 #include "minitrace.h"
 
+#define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
+
 // Ugh, this struct is already pretty heavy.
 // Will probably need to move arguments to a second buffer to support more than one.
 typedef struct raw_event {
@@ -228,16 +230,16 @@ void mtr_flush() {
 		int len;
 		switch (raw->arg_type) {
 		case MTR_ARG_TYPE_INT:
-			sprintf(arg_buf, "\"%s\":%i", raw->arg_name, raw->a_int);
+			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":%i", raw->arg_name, raw->a_int);
 			break;
 		case MTR_ARG_TYPE_STRING_CONST:
-			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
+			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_STRING_COPY:
 			if (strlen(raw->a_str) > 700) {
 				((char*)raw->a_str)[700] = 0;
 			}
-			sprintf(arg_buf, "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
+			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_NONE:
 		default:
@@ -250,10 +252,10 @@ void mtr_flush() {
 			case 'T':
 			case 'F':
 				// TODO: Support full 64-bit pointers
-				sprintf(id_buf, ",\"id\":\"0x%08x\"", (uint32_t)(uintptr_t)raw->id);
+				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"id\":\"0x%08x\"", (uint32_t)(uintptr_t)raw->id);
 				break;
 			case 'X':
-				sprintf(id_buf, ",\"dur\":%i", (int)raw->a_double);
+				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"dur\":%i", (int)raw->a_double);
 				break;
 			}
 		} else {
@@ -275,7 +277,7 @@ void mtr_flush() {
 		}
 #endif
 
-		len = sprintf(linebuf, "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%llu,\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
+		len = snprintf(linebuf, ARRAY_SIZE(linebuf), "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%llu,\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
 				first_line ? "" : ",\n",
 				cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name, arg_buf, id_buf);
 		fwrite(linebuf, 1, len, f);
