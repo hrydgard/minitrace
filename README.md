@@ -2,14 +2,15 @@ minitrace
 =========
 by Henrik Rydgård 2014 (hrydgard+minitrace@gmail.com)
 
-C library with C++ helpers for producing JSON traces suitable for Chrome's excellent built-in trace viewer (chrome://tracing).
+MIT licensed, feel free to use however you want. If you use it for something cool, I'd love to hear about it!
+
+This is a C library with C++ helpers for producing JSON traces suitable for Chrome's excellent built-in trace viewer (chrome://tracing).
 
 Extremely simple to build and use. Tested on Mac and Windows, but should compile anywhere you can use ANSI C with few or no changes.
 
 Sample output (see example code below):
 
 ![minitrace](http://www.ppsspp.org/img/minitrace.png)
-
 
 Remember to be careful when interpreting the output. This is not a sampling profiler, so it only records start and stop times for blocks. This means that blocks grow even when the CPU is off running another thread, and that it can look like work is being done on more blocks at a time than you have CPUs.
 
