@@ -24,7 +24,7 @@ minitrace_test: $(OBJS)
 	$(CXX) -o $@ $^ ${CFLAGS}
 
 minitrace_test_mt: $(OBJS2)
-	$(CXX) -o $@ $^ ${LDFLAGS}
+	$(CXX) -o $@ $^ -lpthread ${LDFLAGS}
 
 clean:
 	rm -f *.o *.d minitrace_test minitrace_test_mt
