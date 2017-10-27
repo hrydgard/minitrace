@@ -184,7 +184,7 @@ const char *mtr_pool_string(const char *str) {
 	int i;
 	for (i = 0; i < STRING_POOL_SIZE; i++) {
 		if (!str_pool[i]) {
-			str_pool[i] = malloc(strlen(str) + 1);
+			str_pool[i] = (char*)malloc(strlen(str) + 1);
 			strcpy(str_pool[i], str);
 			return str_pool[i];
 		} else {
@@ -277,7 +277,7 @@ void mtr_flush() {
 		}
 #endif
 
-		len = snprintf(linebuf, ARRAY_SIZE(linebuf), "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%llu,\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
+		len = snprintf(linebuf, ARRAY_SIZE(linebuf), "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%ld,\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
 				first_line ? "" : ",\n",
 				cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name, arg_buf, id_buf);
 		fwrite(linebuf, 1, len, f);
