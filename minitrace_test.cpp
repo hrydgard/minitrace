@@ -26,7 +26,7 @@ void a() {
 	usleep(10000);
 }
 
-int main(int argc, const char *argv[]) {
+int main() {
 	int i;
 	mtr_init("trace.json");
 	mtr_register_sigint_handler();
