@@ -38,7 +38,7 @@ void phase2() {
 	}
 }
 
-int main(int argc, const char *argv[]) {
+int main() {
 	int i;
 	mtr_init("mt_trace.json");
 	MTR_META_PROCESS_NAME("Multithreaded Test");
