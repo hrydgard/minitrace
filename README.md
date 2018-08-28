@@ -28,7 +28,9 @@ How to use
 
         mtr_shutdown();
 
-  4. In all functions you want to profile:
+  4. Make sure MTR_ENABLED is defined globally when you want to profile, for example -DMTR_ENABLED
+
+  5. In all functions you want to profile:
 
         // C
         MTR_BEGIN("GFX", "RasterizeTriangle")
@@ -38,15 +40,13 @@ How to use
         // C++
         MTR_SCOPE("GFX", "RasterizeTriangle")
 
-  5. In Google Chrome open "about:tracing"
+  6. In Google Chrome open "about:tracing"
 
-  6. Click Open, and choose your trace.json
+  7. Click Open, and choose your trace.json
 
-  7. Navigate the trace view using the WASD keys, and Look for bottlenecks and optimize your application. 
+  8. Navigate the trace view using the WASD keys, and Look for bottlenecks and optimize your application.
 
-  8. In your final release build, build with
-
-         -DMTR_DISABLE
+  9. In your final release build, don't forget to remove -DMTR_ENABLED or however you set the define.
 
 
 By default, it will collect 1 million tracepoints and then stop. You can change this behaviour, see the
