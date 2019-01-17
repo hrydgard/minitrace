@@ -18,6 +18,8 @@
 // More:
 // http://www.altdevblogaday.com/2012/08/21/using-chrometracing-to-view-your-inline-profiling-data/
 
+#pragma once
+
 #include <inttypes.h>
 
 // If MTR_ENABLED is not defined, Minitrace does nothing and has near zero overhead.
