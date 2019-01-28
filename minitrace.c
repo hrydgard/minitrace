@@ -280,8 +280,8 @@ void mtr_flush() {
 		const char *cat = raw->cat;
 #ifdef _WIN32
 		// On Windows, we often end up with backslashes in category.
+		char temp[256];
 		{
-			char temp[256];
 			int len = (int)strlen(cat);
 			int i;
 			if (len > 255) len = 255;

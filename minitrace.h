@@ -18,6 +18,9 @@
 // More:
 // http://www.altdevblogaday.com/2012/08/21/using-chrometracing-to-view-your-inline-profiling-data/
 
+#ifndef MINITRACE_H
+#define MINITRACE_H
+
 #include <inttypes.h>
 
 // If MTR_ENABLED is not defined, Minitrace does nothing and has near zero overhead.
@@ -256,6 +259,8 @@ private:
 	const char *category_;
 	const char *name_;
 };
+#endif
+
 #endif
 
 #endif
