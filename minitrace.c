@@ -28,6 +28,12 @@
 
 #include "minitrace.h"
 
+#ifdef __GNUC__
+#define ATTR_NORETURN __attribute__((noreturn))
+#else
+#define ATTR_NORETURN
+#endif
+
 #define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
 
 // Ugh, this struct is already pretty heavy.
@@ -131,6 +137,7 @@ double mtr_time_s() {
 }
 #endif	// !BLACKBERRY
 
+static void termination_handler(int signum) ATTR_NORETURN;
 static void termination_handler(int signum) {
 	(void) signum;
 	if (is_tracing) {
@@ -246,12 +253,12 @@ void mtr_flush() {
 			break;
 		case MTR_ARG_TYPE_STRING_COPY:
 			if (strlen(raw->a_str) > 700) {
-				((char*)raw->a_str)[700] = 0;
+				snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%.*s\"", raw->arg_name, 700, raw->a_str);
+			} else {
+				snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			}
-			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
 			break;
 		case MTR_ARG_TYPE_NONE:
-		default:
 			arg_buf[0] = '\0';
 			break;
 		}
@@ -374,8 +381,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	case MTR_ARG_TYPE_INT: ev->a_int = (int)(uintptr_t)arg_value; break;
 	case MTR_ARG_TYPE_STRING_CONST:	ev->a_str = (const char*)arg_value; break;
 	case MTR_ARG_TYPE_STRING_COPY: ev->a_str = strdup((const char*)arg_value); break;
-	default:
-		break;
+	case MTR_ARG_TYPE_NONE: break;
 	}
 }
 
