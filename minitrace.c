@@ -318,9 +318,9 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 		cur_process_id = get_cur_process_id();
 	}
 
-#if 0 && _WIN32	// TODO: This needs testing
-	int bufPos = InterlockedIncrement(&count);
-	raw_event_t *ev = &buffer[count - 1];
+#if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
+	int bufPos = InterlockedExchangeAdd((LONG volatile *)&count, 1);
+	raw_event_t *ev = &buffer[bufPos];
 #else
 	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count];
@@ -358,9 +358,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	}
 	double ts = mtr_time_s();
 
-#if 0 && _WIN32	// TODO: This needs testing
-	int bufPos = InterlockedIncrement(&count);
-	raw_event_t *ev = &buffer[count - 1];
+#if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
+	int bufPos = InterlockedExchangeAdd((LONG volatile *)&count, 1);
+	raw_event_t *ev = &buffer[bufPos];
 #else
 	pthread_mutex_lock(&mutex);
 	raw_event_t *ev = &buffer[count];
