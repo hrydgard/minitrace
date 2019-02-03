@@ -160,19 +160,26 @@ void mtr_register_sigint_handler() {
 
 #endif
 
-void mtr_init(const char *json_file) {
+void mtr_init_from_stream(void *stream) {
 #ifndef MTR_ENABLED
 	return;
 #endif
 	buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	is_tracing = 1;
 	count = 0;
-	f = fopen(json_file, "wb");
+	f = (FILE *)stream;
 	const char *header = "{\"traceEvents\":[\n";
 	fwrite(header, 1, strlen(header), f);
 	time_offset = (uint64_t)(mtr_time_s() * 1000000);
 	first_line = 1;
 	pthread_mutex_init(&mutex, 0);
+}
+
+void mtr_init(const char *json_file) {
+#ifndef MTR_ENABLED
+	return;
+#endif
+	mtr_init_from_stream(fopen(json_file, "wb"));
 }
 
 void mtr_shutdown() {
