@@ -349,6 +349,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	}
 	ev->tid = cur_thread_id;
 	ev->pid = cur_process_id;
+	ev->arg_type = MTR_ARG_TYPE_NONE;
 }
 
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value) {
