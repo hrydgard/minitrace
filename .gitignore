@@ -27,6 +27,7 @@ Release
 x64
 *.suo
 *.vs
+*.user
 
 # Misc
 .gitattributes
