@@ -56,6 +56,7 @@ typedef struct raw_event {
 } raw_event_t;
 
 static raw_event_t *buffer;
+static raw_event_t *second_buffer;
 static volatile int count;
 static int is_tracing = 0;
 static int64_t time_offset;
@@ -165,6 +166,7 @@ void mtr_init_from_stream(void *stream) {
 	return;
 #endif
 	buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
+	second_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	is_tracing = 1;
 	count = 0;
 	f = (FILE *)stream;
@@ -195,6 +197,8 @@ void mtr_shutdown() {
 	f = 0;
 	free(buffer);
 	buffer = 0;
+	free(second_buffer);
+	second_buffer = 0;
 	for (i = 0; i < STRING_POOL_SIZE; i++) {
 		if (str_pool[i]) {
 			free(str_pool[i]);
@@ -244,11 +248,21 @@ void mtr_flush() {
 	// We have to lock while flushing. So we really should avoid flushing as much as possible.
 
 	pthread_mutex_lock(&mutex);
-	int old_tracing = is_tracing;
-	is_tracing = 0;	// Stop logging even if using interlocked increments instead of the mutex. Can cause data loss.
+	// use double_buffering for flushing: we create two buffers and swap them here on every flush
+	// thus flushing and tracing can happen concurrently without them intermingeling
+	// note: this assumes that only one flush can be active at any point in time!
+	raw_event_t *tmp_buffer_ptr = buffer;
+	buffer = second_buffer;
+	second_buffer = tmp_buffer_ptr;
 
-	for (i = 0; i < count; i++) {
-		raw_event_t *raw = &buffer[i];
+	// locally save and reset the count here, as the now swapped buffer is ready to be overridden
+	int flush_count = count;
+	count = 0; 
+	// release the lock now, as tracing now operates on the second buffer (this function may no longer touch buffer)
+	pthread_mutex_unlock(&mutex);
+
+	for (i = 0; i < flush_count; i++) {
+		raw_event_t *raw = &second_buffer[i];
 		int len;
 		switch (raw->arg_type) {
 		case MTR_ARG_TYPE_INT:
@@ -305,9 +319,6 @@ void mtr_flush() {
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 	}
-	count = 0;
-	is_tracing = old_tracing;
-	pthread_mutex_unlock(&mutex);
 }
 
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
