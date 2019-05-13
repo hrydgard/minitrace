@@ -55,8 +55,7 @@ typedef struct raw_event {
 	};
 } raw_event_t;
 
-static raw_event_t *buffer;
-static raw_event_t *second_buffer;
+static raw_event_t *buffer[2];
 static volatile int count;
 static int is_tracing = 0;
 static int64_t time_offset;
@@ -165,8 +164,8 @@ void mtr_init_from_stream(void *stream) {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
-	second_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
+	buffer[0] = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
+	buffer[1] = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	is_tracing = 1;
 	count = 0;
 	f = (FILE *)stream;
@@ -195,10 +194,10 @@ void mtr_shutdown() {
 	fclose(f);
 	pthread_mutex_destroy(&mutex);
 	f = 0;
-	free(buffer);
-	buffer = 0;
-	free(second_buffer);
-	second_buffer = 0;
+	free(buffer[0]);
+	buffer[0] = 0;
+	free(buffer[1]);
+	buffer[1] = 0;
 	for (i = 0; i < STRING_POOL_SIZE; i++) {
 		if (str_pool[i]) {
 			free(str_pool[i]);
@@ -251,18 +250,18 @@ void mtr_flush() {
 	// use double_buffering for flushing: we create two buffers and swap them here on every flush
 	// thus flushing and tracing can happen concurrently without them intermingeling
 	// note: this assumes that only one flush can be active at any point in time!
-	raw_event_t *tmp_buffer_ptr = buffer;
-	buffer = second_buffer;
-	second_buffer = tmp_buffer_ptr;
+	raw_event_t *tmp_buffer_ptr = buffer[0];
+	buffer[0] = buffer[1];
+	buffer[1] = tmp_buffer_ptr;
 
 	// locally save and reset the count here, as the now swapped buffer is ready to be overridden
 	int flush_count = count;
-	count = 0; 
+	count = 0;
 	// release the lock now, as tracing now operates on the second buffer (this function may no longer touch buffer)
 	pthread_mutex_unlock(&mutex);
 
 	for (i = 0; i < flush_count; i++) {
-		raw_event_t *raw = &second_buffer[i];
+		raw_event_t *raw = &buffer[1][i];
 		int len;
 		switch (raw->arg_type) {
 		case MTR_ARG_TYPE_INT:
@@ -340,7 +339,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	raw_event_t *ev = &buffer[bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[count];
+	raw_event_t *ev = &buffer[1][count];
 	count++;
 	pthread_mutex_unlock(&mutex);
 #endif
@@ -378,10 +377,10 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 
 #if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
 	int bufPos = InterlockedExchangeAdd((LONG volatile *)&count, 1);
-	raw_event_t *ev = &buffer[bufPos];
+	raw_event_t *ev = &buffer[1][bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[count];
+	raw_event_t *ev = &buffer[1][count];
 	count++;
 	pthread_mutex_unlock(&mutex);
 #endif
