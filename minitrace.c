@@ -64,6 +64,7 @@ static FILE *f;
 static __thread int cur_thread_id;	// Thread local storage
 static int cur_process_id;
 static pthread_mutex_t mutex;
+static pthread_mutex_t flush_mutex;
 
 #define STRING_POOL_SIZE 100
 static char *str_pool[100];
@@ -174,6 +175,7 @@ void mtr_init_from_stream(void *stream) {
 	time_offset = (uint64_t)(mtr_time_s() * 1000000);
 	first_line = 1;
 	pthread_mutex_init(&mutex, 0);
+	pthread_mutex_init(&flush_mutex, 0);
 }
 
 void mtr_init(const char *json_file) {
@@ -193,6 +195,7 @@ void mtr_shutdown() {
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
 	pthread_mutex_destroy(&mutex);
+	pthread_mutex_destroy(&flush_mutex);
 	f = 0;
 	free(buffer[0]);
 	buffer[0] = 0;
@@ -244,20 +247,17 @@ void mtr_flush() {
 	char linebuf[1024];
 	char arg_buf[1024];
 	char id_buf[256];
-	// We have to lock while flushing. So we really should avoid flushing as much as possible.
 
-	pthread_mutex_lock(&mutex);
-	// use double_buffering for flushing: we create two buffers and swap them here on every flush
+	// use double buffering for flushing:
+	// we create two buffers and copy data from the main buffer over to the second on flush.
 	// thus flushing and tracing can happen concurrently without them intermingeling
-	// note: this assumes that only one flush can be active at any point in time!
-	raw_event_t *tmp_buffer_ptr = buffer[0];
-	buffer[0] = buffer[1];
-	buffer[1] = tmp_buffer_ptr;
-
-	// locally save and reset the count here, as the now swapped buffer is ready to be overridden
+	// only one flush may be active at all times, which is ensured by flush_mutex
+	pthread_mutex_lock(&flush_mutex);
+	pthread_mutex_lock(&mutex);
 	int flush_count = count;
 	count = 0;
-	// release the lock now, as tracing now operates on the second buffer (this function may no longer touch buffer)
+	memcpy(buffer[1], buffer[0], flush_count * sizeof(raw_event_t));
+	// release the main mutex now, as tracing now operates on the second buffer (this function may no longer touch buffer[0])
 	pthread_mutex_unlock(&mutex);
 
 	for (i = 0; i < flush_count; i++) {
@@ -318,6 +318,7 @@ void mtr_flush() {
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 	}
+	pthread_mutex_unlock(&flush_mutex);
 }
 
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
@@ -336,10 +337,10 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 
 #if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
 	int bufPos = InterlockedExchangeAdd((LONG volatile *)&count, 1);
-	raw_event_t *ev = &buffer[bufPos];
+	raw_event_t *ev = &buffer[0][bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[1][count];
+	raw_event_t *ev = &buffer[0][count];
 	count++;
 	pthread_mutex_unlock(&mutex);
 #endif
@@ -377,10 +378,10 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 
 #if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
 	int bufPos = InterlockedExchangeAdd((LONG volatile *)&count, 1);
-	raw_event_t *ev = &buffer[1][bufPos];
+	raw_event_t *ev = &buffer[0][bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[1][count];
+	raw_event_t *ev = &buffer[0][count];
 	count++;
 	pthread_mutex_unlock(&mutex);
 #endif
