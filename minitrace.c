@@ -304,6 +304,11 @@ void mtr_flush() {
 				cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name, arg_buf, id_buf);
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
+
+		#ifdef MTR_COPY_EVENT_CATEGORY_AND_NAME
+		free(raw->name);
+		free(raw->cat);
+		#endif
 	}
 	count = 0;
 	is_tracing = old_tracing;
@@ -334,8 +339,20 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	pthread_mutex_unlock(&mutex);
 #endif
 
+#ifdef MTR_COPY_EVENT_CATEGORY_AND_NAME
+	const size_t category_len = strlen(category);
+	ev->cat = malloc(category_len + 1);
+	strcpy(ev->cat, category);
+
+	const size_t name_len = strlen(name);
+	ev->name = malloc(name_len + 1);
+	strcpy(ev->name, name);
+
+#else
 	ev->cat = category;
 	ev->name = name;
+#endif
+
 	ev->id = id;
 	ev->ph = ph;
 	if (ev->ph == 'X') {
@@ -375,8 +392,20 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	pthread_mutex_unlock(&mutex);
 #endif
 
+#ifdef MTR_COPY_EVENT_CATEGORY_AND_NAME
+	const size_t category_len = strlen(category);
+	ev->cat = malloc(category_len + 1);
+	strcpy(ev->cat, category);
+
+	const size_t name_len = strlen(name);
+	ev->name = malloc(name_len + 1);
+	strcpy(ev->name, name);
+
+#else
 	ev->cat = category;
 	ev->name = name;
+#endif
+
 	ev->id = id;
 	ev->ts = (int64_t)(ts * 1000000);
 	ev->ph = ph;
