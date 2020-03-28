@@ -35,6 +35,8 @@
 #endif
 
 #define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
+#define TRUE 1
+#define FALSE 0
 
 // Ugh, this struct is already pretty heavy.
 // Will probably need to move arguments to a second buffer to support more than one.
