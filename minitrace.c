@@ -57,7 +57,7 @@ typedef struct raw_event {
 	};
 } raw_event_t;
 
-static raw_event_t *buffer;
+static raw_event_t *event_buffer;
 static volatile int count;
 static int is_tracing = 0;
 static int64_t time_offset;
@@ -166,7 +166,7 @@ void mtr_init_from_stream(void *stream) {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
+	event_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	is_tracing = 1;
 	count = 0;
 	f = (FILE *)stream;
@@ -195,8 +195,8 @@ void mtr_shutdown() {
 	fclose(f);
 	pthread_mutex_destroy(&mutex);
 	f = 0;
-	free(buffer);
-	buffer = 0;
+	free(event_buffer);
+	event_buffer = 0;
 	for (i = 0; i < STRING_POOL_SIZE; i++) {
 		if (str_pool[i]) {
 			free(str_pool[i]);
@@ -250,7 +250,7 @@ void mtr_flush() {
 	is_tracing = 0;	// Stop logging even if using interlocked increments instead of the mutex. Can cause data loss.
 
 	for (i = 0; i < count; i++) {
-		raw_event_t *raw = &buffer[i];
+		raw_event_t *raw = &event_buffer[i];
 		int len;
 		switch (raw->arg_type) {
 		case MTR_ARG_TYPE_INT:
@@ -336,7 +336,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	raw_event_t *ev = &buffer[bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[count];
+	raw_event_t *ev = &event_buffer[count];
 	count++;
 	pthread_mutex_unlock(&mutex);
 #endif
@@ -389,7 +389,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	raw_event_t *ev = &buffer[bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &buffer[count];
+	raw_event_t *ev = &event_buffer[count];
 	count++;
 	pthread_mutex_unlock(&mutex);
 #endif
