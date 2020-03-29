@@ -58,8 +58,10 @@ typedef struct raw_event {
 } raw_event_t;
 
 static raw_event_t *event_buffer;
+static raw_event_t *flush_buffer;
 static volatile int event_count;
-static int is_tracing = 0;
+static int is_tracing = FALSE;
+static int is_flushing = FALSE;
 static int64_t time_offset;
 static int first_line = 1;
 static FILE *f;
@@ -167,6 +169,7 @@ void mtr_init_from_stream(void *stream) {
 	return;
 #endif
 	event_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
+	flush_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	is_tracing = 1;
 	event_count = 0;
 	f = (FILE *)stream;
@@ -189,8 +192,12 @@ void mtr_shutdown() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	is_tracing = 0;
 	mtr_flush();
+	// switching is_flushing to true till the end
+	pthread_mutex_lock(&mutex);
+	is_flushing = TRUE;
+	is_tracing = FALSE;
+	pthread_mutex_unlock(&mutex);
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
 	pthread_mutex_destroy(&mutex);
@@ -235,22 +242,38 @@ void mtr_stop() {
 }
 
 // TODO: fwrite more than one line at a time.
+// Flushing is thread safe and process async
+// using double-buffering mechanism.
+// Aware: only one flushing process may be 
+// running at any point of time
 void mtr_flush() {
 #ifndef MTR_ENABLED
 	return;
 #endif
 	int i = 0;
+	int event_count_copy = 0;
+	raw_event_t *event_buffer_tmp = NULL;
 	char linebuf[1024];
 	char arg_buf[1024];
 	char id_buf[256];
-	// We have to lock while flushing. So we really should avoid flushing as much as possible.
 
+	// if not flushing already
+	// then swap buffers
 	pthread_mutex_lock(&mutex);
-	int old_tracing = is_tracing;
-	is_tracing = 0;	// Stop logging even if using interlocked increments instead of the mutex. Can cause data loss.
+	if (is_flushing) {
+		pthread_mutex_unlock(&mutex);
+		return;
+	}
+	is_flushing = TRUE;
+	event_count_copy = event_count;
+	event_buffer_tmp = flush_buffer;
+	flush_buffer = event_buffer;
+	event_buffer = event_buffer_tmp;
+	event_count = 0;
+	pthread_mutex_unlock(&mutex);
 
-	for (i = 0; i < event_count; i++) {
-		raw_event_t *raw = &event_buffer[i];
+	for (i = 0; i < event_count_copy; i++) {
+		raw_event_t *raw = &flush_buffer[i];
 		int len;
 		switch (raw->arg_type) {
 		case MTR_ARG_TYPE_INT:
@@ -312,8 +335,9 @@ void mtr_flush() {
 		free(raw->cat);
 		#endif
 	}
-	event_count = 0;
-	is_tracing = old_tracing;
+
+	pthread_mutex_lock(&mutex);
+	is_flushing = FALSE;
 	pthread_mutex_unlock(&mutex);
 }
 
@@ -321,8 +345,15 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (!is_tracing || event_count >= INTERNAL_MINITRACE_BUFFER_SIZE)
+	pthread_mutex_lock(&mutex);
+	if (!is_tracing || event_count >= INTERNAL_MINITRACE_BUFFER_SIZE) {
+		pthread_mutex_unlock(&mutex);
 		return;
+	}
+	raw_event_t *ev = &event_buffer[event_count];
+	event_count++;
+	pthread_mutex_unlock(&mutex);
+
 	double ts = mtr_time_s();
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
@@ -330,16 +361,6 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	if (!cur_process_id) {
 		cur_process_id = get_cur_process_id();
 	}
-
-#if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
-	int bufPos = InterlockedExchangeAdd((LONG volatile *)&event_count, 1);
-	raw_event_t *ev = &buffer[bufPos];
-#else
-	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &event_buffer[event_count];
-	event_count++;
-	pthread_mutex_unlock(&mutex);
-#endif
 
 #ifdef MTR_COPY_EVENT_CATEGORY_AND_NAME
 	const size_t category_len = strlen(category);
@@ -374,8 +395,15 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (!is_tracing || event_count >= INTERNAL_MINITRACE_BUFFER_SIZE)
+	pthread_mutex_lock(&mutex);
+	if (!is_tracing || event_count >= INTERNAL_MINITRACE_BUFFER_SIZE) {
+		pthread_mutex_unlock(&mutex);
 		return;
+	}
+	raw_event_t *ev = &event_buffer[event_count];
+	event_count++;
+	pthread_mutex_unlock(&mutex);
+
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
 	}
@@ -383,16 +411,6 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 		cur_process_id = get_cur_process_id();
 	}
 	double ts = mtr_time_s();
-
-#if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
-	int bufPos = InterlockedExchangeAdd((LONG volatile *)&event_count, 1);
-	raw_event_t *ev = &buffer[bufPos];
-#else
-	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &event_buffer[event_count];
-	event_count++;
-	pthread_mutex_unlock(&mutex);
-#endif
 
 #ifdef MTR_COPY_EVENT_CATEGORY_AND_NAME
 	const size_t category_len = strlen(category);
