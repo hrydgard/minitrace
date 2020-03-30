@@ -74,6 +74,9 @@ static pthread_mutex_t event_mutex;
 #define STRING_POOL_SIZE 100
 static char *str_pool[100];
 
+// forward declaration
+void mtr_flush_with_state(int);
+
 // Tiny portability layer.
 // Exposes:
 //	 get_cur_thread_id()
@@ -195,12 +198,11 @@ void mtr_shutdown() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	mtr_flush();
-	// switching is_flushing to true till the end
 	pthread_mutex_lock(&mutex);
-	is_flushing = TRUE;
 	is_tracing = FALSE;
 	pthread_mutex_unlock(&mutex);
+	mtr_flush_with_state(TRUE);
+
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
 	pthread_mutex_destroy(&mutex);
@@ -254,7 +256,7 @@ void mtr_stop() {
 // using double-buffering mechanism.
 // Aware: only one flushing process may be 
 // running at any point of time
-void mtr_flush() {
+void mtr_flush_with_state(int is_last) {
 #ifndef MTR_ENABLED
 	return;
 #endif
@@ -355,8 +357,12 @@ void mtr_flush() {
 	}
 
 	pthread_mutex_lock(&mutex);
-	is_flushing = FALSE;
+	is_flushing = is_last;
 	pthread_mutex_unlock(&mutex);
+}
+
+void mtr_flush() {
+	mtr_flush_with_state(FALSE);
 }
 
 void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id) {
