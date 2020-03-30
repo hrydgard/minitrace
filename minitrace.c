@@ -376,7 +376,9 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	}
 	raw_event_t *ev = &event_buffer[event_count];
 	++event_count;
+	pthread_mutex_lock(&event_mutex);
 	++events_in_progress;
+	pthread_mutex_unlock(&event_mutex);
 	pthread_mutex_unlock(&mutex);
 
 	double ts = mtr_time_s();
@@ -431,7 +433,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	}
 	raw_event_t *ev = &event_buffer[event_count];
 	++event_count;
+	pthread_mutex_lock(&event_mutex);
 	++events_in_progress;
+	pthread_mutex_unlock(&event_mutex);
 	pthread_mutex_unlock(&mutex);
 
 	if (!cur_thread_id) {
