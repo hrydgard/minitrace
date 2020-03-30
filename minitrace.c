@@ -235,14 +235,18 @@ void mtr_start() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	is_tracing = 1;
+	pthread_mutex_lock(&mutex);
+	is_tracing = TRUE;
+	pthread_mutex_unlock(&mutex);
 }
 
 void mtr_stop() {
 #ifndef MTR_ENABLED
 	return;
 #endif
-	is_tracing = 0;
+	pthread_mutex_lock(&mutex);
+	is_tracing = FALSE;
+	pthread_mutex_unlock(&mutex);
 }
 
 // TODO: fwrite more than one line at a time.
