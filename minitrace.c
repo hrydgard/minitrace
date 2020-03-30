@@ -58,7 +58,7 @@ typedef struct raw_event {
 } raw_event_t;
 
 static raw_event_t *event_buffer;
-static volatile int count;
+static volatile int event_count;
 static int is_tracing = 0;
 static int64_t time_offset;
 static int first_line = 1;
@@ -168,7 +168,7 @@ void mtr_init_from_stream(void *stream) {
 #endif
 	event_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	is_tracing = 1;
-	count = 0;
+	event_count = 0;
 	f = (FILE *)stream;
 	const char *header = "{\"traceEvents\":[\n";
 	fwrite(header, 1, strlen(header), f);
@@ -249,7 +249,7 @@ void mtr_flush() {
 	int old_tracing = is_tracing;
 	is_tracing = 0;	// Stop logging even if using interlocked increments instead of the mutex. Can cause data loss.
 
-	for (i = 0; i < count; i++) {
+	for (i = 0; i < event_count; i++) {
 		raw_event_t *raw = &event_buffer[i];
 		int len;
 		switch (raw->arg_type) {
@@ -312,7 +312,7 @@ void mtr_flush() {
 		free(raw->cat);
 		#endif
 	}
-	count = 0;
+	event_count = 0;
 	is_tracing = old_tracing;
 	pthread_mutex_unlock(&mutex);
 }
@@ -321,7 +321,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (!is_tracing || count >= INTERNAL_MINITRACE_BUFFER_SIZE)
+	if (!is_tracing || event_count >= INTERNAL_MINITRACE_BUFFER_SIZE)
 		return;
 	double ts = mtr_time_s();
 	if (!cur_thread_id) {
@@ -332,12 +332,12 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	}
 
 #if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
-	int bufPos = InterlockedExchangeAdd((LONG volatile *)&count, 1);
+	int bufPos = InterlockedExchangeAdd((LONG volatile *)&event_count, 1);
 	raw_event_t *ev = &buffer[bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &event_buffer[count];
-	count++;
+	raw_event_t *ev = &event_buffer[event_count];
+	event_count++;
 	pthread_mutex_unlock(&mutex);
 #endif
 
@@ -374,7 +374,7 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 #ifndef MTR_ENABLED
 	return;
 #endif
-	if (!is_tracing || count >= INTERNAL_MINITRACE_BUFFER_SIZE)
+	if (!is_tracing || event_count >= INTERNAL_MINITRACE_BUFFER_SIZE)
 		return;
 	if (!cur_thread_id) {
 		cur_thread_id = get_cur_thread_id();
@@ -385,12 +385,12 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	double ts = mtr_time_s();
 
 #if 0 && _WIN32	// This should work, feel free to enable if you're adventurous and need performance.
-	int bufPos = InterlockedExchangeAdd((LONG volatile *)&count, 1);
+	int bufPos = InterlockedExchangeAdd((LONG volatile *)&event_count, 1);
 	raw_event_t *ev = &buffer[bufPos];
 #else
 	pthread_mutex_lock(&mutex);
-	raw_event_t *ev = &event_buffer[count];
-	count++;
+	raw_event_t *ev = &event_buffer[event_count];
+	event_count++;
 	pthread_mutex_unlock(&mutex);
 #endif
 
