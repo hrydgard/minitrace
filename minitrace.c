@@ -62,12 +62,14 @@ static raw_event_t *flush_buffer;
 static volatile int event_count;
 static int is_tracing = FALSE;
 static int is_flushing = FALSE;
+static int events_in_progress = 0;
 static int64_t time_offset;
 static int first_line = 1;
 static FILE *f;
 static __thread int cur_thread_id;	// Thread local storage
 static int cur_process_id;
 static pthread_mutex_t mutex;
+static pthread_mutex_t event_mutex;
 
 #define STRING_POOL_SIZE 100
 static char *str_pool[100];
@@ -178,6 +180,7 @@ void mtr_init_from_stream(void *stream) {
 	time_offset = (uint64_t)(mtr_time_s() * 1000000);
 	first_line = 1;
 	pthread_mutex_init(&mutex, 0);
+	pthread_mutex_init(&event_mutex, 0);
 }
 
 void mtr_init(const char *json_file) {
@@ -201,6 +204,7 @@ void mtr_shutdown() {
 	fwrite("\n]}\n", 1, 4, f);
 	fclose(f);
 	pthread_mutex_destroy(&mutex);
+	pthread_mutex_destroy(&event_mutex);
 	f = 0;
 	free(event_buffer);
 	event_buffer = 0;
@@ -251,15 +255,19 @@ void mtr_flush() {
 	return;
 #endif
 	int i = 0;
-	int event_count_copy = 0;
-	raw_event_t *event_buffer_tmp = NULL;
 	char linebuf[1024];
 	char arg_buf[1024];
 	char id_buf[256];
+	int event_count_copy = 0;
+	int events_in_progress_copy = 1;
+	raw_event_t *event_buffer_tmp = NULL;
 
-	// if not flushing already
-	// then swap buffers
+	// small critical section to swap buffers
+	// - no any new events can be spawn while
+	//   swapping since they tied to the same mutex
+	// - checks for any flushing in process
 	pthread_mutex_lock(&mutex);
+	// if not flushing already
 	if (is_flushing) {
 		pthread_mutex_unlock(&mutex);
 		return;
@@ -270,6 +278,12 @@ void mtr_flush() {
 	flush_buffer = event_buffer;
 	event_buffer = event_buffer_tmp;
 	event_count = 0;
+	// waiting for any unfinished events before swap
+	while (events_in_progress_copy != 0) {
+		pthread_mutex_lock(&event_mutex);
+		events_in_progress_copy = events_in_progress;
+		pthread_mutex_unlock(&event_mutex);
+	}
 	pthread_mutex_unlock(&mutex);
 
 	for (i = 0; i < event_count_copy; i++) {
@@ -351,7 +365,8 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 		return;
 	}
 	raw_event_t *ev = &event_buffer[event_count];
-	event_count++;
+	++event_count;
+	++events_in_progress;
 	pthread_mutex_unlock(&mutex);
 
 	double ts = mtr_time_s();
@@ -389,6 +404,10 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 	ev->tid = cur_thread_id;
 	ev->pid = cur_process_id;
 	ev->arg_type = MTR_ARG_TYPE_NONE;
+
+	pthread_mutex_lock(&event_mutex);
+	--events_in_progress;
+	pthread_mutex_unlock(&event_mutex);
 }
 
 void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value) {
@@ -401,7 +420,8 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 		return;
 	}
 	raw_event_t *ev = &event_buffer[event_count];
-	event_count++;
+	++event_count;
+	++events_in_progress;
 	pthread_mutex_unlock(&mutex);
 
 	if (!cur_thread_id) {
@@ -439,5 +459,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	case MTR_ARG_TYPE_STRING_COPY: ev->a_str = strdup((const char*)arg_value); break;
 	case MTR_ARG_TYPE_NONE: break;
 	}
+
+	pthread_mutex_lock(&event_mutex);
+	--events_in_progress;
+	pthread_mutex_lock(&event_mutex);
 }
 
