@@ -350,6 +350,9 @@ void mtr_flush_with_state(int is_last) {
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 
+		if (raw->arg_type == MTR_ARG_TYPE_STRING_COPY) {
+			free((void*)raw->a_str);
+		}
 		#ifdef MTR_COPY_EVENT_CATEGORY_AND_NAME
 		free(raw->name);
 		free(raw->cat);
