@@ -29,6 +29,9 @@ x64
 *.vs
 *.user
 
+# CMake build dir
+build/
+
 # Misc
 .gitattributes
 
