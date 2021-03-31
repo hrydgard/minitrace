@@ -26,7 +26,7 @@
 #include <unistd.h>
 #endif
 
-#include "minitrace.h"
+#include <minitrace.h>
 
 #ifdef __GNUC__
 #define ATTR_NORETURN __attribute__((noreturn))
