@@ -33,7 +33,7 @@ endif()
 
 target_include_directories(${PROJECT_NAME} INTERFACE $<INSTALL_INTERFACE:include>)
 
-install(TARGETS ${PROJECT_NAME} EXPORT minitrace DESTINATION lib)
+install(TARGETS ${PROJECT_NAME} EXPORT minitrace)
 install(FILES minitrace.h "${CMAKE_CURRENT_BINARY_DIR}/minitrace_export.h" DESTINATION include)
 install(EXPORT minitrace NAMESPACE minitrace:: FILE "${PROJECT_NAME}Targets.cmake" DESTINATION "share/${PROJECT_NAME}")
 
