@@ -23,6 +23,12 @@
 
 #include <inttypes.h>
 
+#ifdef MTR_BUILDING_WITH_CMAKE
+#include "minitrace_export.h"
+#else
+#define MINITRACE_EXPORT
+#endif
+
 // If MTR_ENABLED is not defined, Minitrace does nothing and has near zero overhead.
 // Preferably, set this flag in your build system. If you can't just uncomment this line.
 // #define MTR_ENABLED
@@ -38,36 +44,36 @@ extern "C" {
 
 // Initializes Minitrace. Must be called very early during startup of your executable,
 // before any MTR_ statements.
-void mtr_init(const char *json_file);
+MINITRACE_EXPORT void mtr_init(const char *json_file);
 // Same as above, but allows passing in a custom stream (FILE *), as returned by
 // fopen(). It should be opened for writing, preferably in binary mode to avoid
 // processing of line endings (i.e. the "wb" mode).
-void mtr_init_from_stream(void *stream);
+MINITRACE_EXPORT void mtr_init_from_stream(void *stream);
 
 // Shuts down minitrace cleanly, flushing the trace buffer.
-void mtr_shutdown(void);
+MINITRACE_EXPORT void mtr_shutdown(void);
 
 // Lets you enable and disable Minitrace at runtime.
 // May cause strange discontinuities in the output.
 // Minitrace is enabled on startup by default.
-void mtr_start(void);
-void mtr_stop(void);
+MINITRACE_EXPORT void mtr_start(void);
+MINITRACE_EXPORT void mtr_stop(void);
 
 // Flushes the collected data to disk, clearing the buffer for new data.
-void mtr_flush(void);
+MINITRACE_EXPORT void mtr_flush(void);
 
 // Returns the current time in seconds. Used internally by Minitrace. No caching.
-double mtr_time_s(void);
+MINITRACE_EXPORT double mtr_time_s(void);
 
 // Registers a handler that will flush the trace on Ctrl+C.
 // Works on Linux and MacOSX, and in Win32 console applications.
-void mtr_register_sigint_handler(void);
+MINITRACE_EXPORT void mtr_register_sigint_handler(void);
 
 // Utility function that should rarely be used.
 // If str is semi dynamic, store it permanently in a small pool so we don't need to malloc it.
 // The pool fills up fast though and performance isn't great.
 // Returns a fixed string if the pool is full.
-const char *mtr_pool_string(const char *str);
+MINITRACE_EXPORT const char *mtr_pool_string(const char *str);
 
 // Commented-out types will be supported in the future.
 typedef enum {
@@ -85,8 +91,8 @@ typedef enum {
 #define MTR_MAX_ARGS 1
 
 // Only use the macros to call these.
-void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id);
-void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value);
+MINITRACE_EXPORT void internal_mtr_raw_event(const char *category, const char *name, char ph, void *id);
+MINITRACE_EXPORT void internal_mtr_raw_event_arg(const char *category, const char *name, char ph, void *id, mtr_arg_type arg_type, const char *arg_name, void *arg_value);
 
 #ifdef MTR_ENABLED
 
