@@ -10,6 +10,8 @@ endif()
 add_library(${PROJECT_NAME} ${MTR_LIB_TYPE} minitrace.c)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
+target_compile_definitions(${PROJECT_NAME} PUBLIC "MTR_BUILDING_WITH_CMAKE")
+
 option(MTR_ENABLED "Enable minitrace" ON)
 if(MTR_ENABLED)
     target_compile_definitions(${PROJECT_NAME} PUBLIC MTR_ENABLED)

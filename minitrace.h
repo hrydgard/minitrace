@@ -23,7 +23,11 @@
 
 #include <inttypes.h>
 
+#ifdef MTR_BUILDING_WITH_CMAKE
 #include "minitrace_export.h"
+#else
+#define MINITRACE_EXPORT
+#endif
 
 // If MTR_ENABLED is not defined, Minitrace does nothing and has near zero overhead.
 // Preferably, set this flag in your build system. If you can't just uncomment this line.
