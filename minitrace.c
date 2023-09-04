@@ -210,6 +210,8 @@ void mtr_shutdown() {
 	f = 0;
 	free(event_buffer);
 	event_buffer = 0;
+	free(flush_buffer);
+	flush_buffer = 0;
 	for (i = 0; i < STRING_POOL_SIZE; i++) {
 		if (str_pool[i]) {
 			free(str_pool[i]);
