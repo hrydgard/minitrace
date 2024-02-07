@@ -175,6 +175,7 @@ void mtr_init_from_stream(void *stream) {
 #endif
 	event_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
 	flush_buffer = (raw_event_t *)malloc(INTERNAL_MINITRACE_BUFFER_SIZE * sizeof(raw_event_t));
+	is_flushing = FALSE;
 	is_tracing = 1;
 	event_count = 0;
 	f = (FILE *)stream;
