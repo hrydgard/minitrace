@@ -325,7 +325,7 @@ void mtr_flush_with_state(int is_last) {
 				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"id\":\"0x%08x\"", (uint32_t)(uintptr_t)raw->id);
 				break;
 			case 'X':
-				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"dur\":%i", (int)raw->a_double);
+				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"dur\":%" PRId64, (int64_t)raw->a_double);
 				break;
 			}
 		} else {
